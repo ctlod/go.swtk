@@ -10,7 +10,7 @@ type MyDisplayPane struct {
 	thePane       swtk.Pane
 	im            draw.Image
 	col           color.Color
-	renderChannel chan swtk.PaneImage
+	renderer 	swtk.Renderer
 	drawChannel   chan int
 	sizeChannel   chan image.Point
 	closeChannel chan int
@@ -34,16 +34,16 @@ func NewMyDisplayPane(a, b int, c color.Color) *MyDisplayPane {
 	return pn
 }
 
-func (pn *MyDisplayPane) CloseChannel () chan int {
-	return pn.closeChannel
+func (pn *MyDisplayPane) Close() {
+	pn.closeChannel <- 1
 }
 
 func (pn *MyDisplayPane) SetPane(p swtk.Pane) {
 	pn.thePane = p
 }
 
-func (dp *MyDisplayPane) SetSize() chan image.Point {
-	return dp.sizeChannel
+func (dp *MyDisplayPane) SetSize(size image.Point) {
+	dp.sizeChannel <- size
 }
 
 func (dp *MyDisplayPane) setSize(s image.Point) {
@@ -72,17 +72,17 @@ func (dp *MyDisplayPane) DrawingHandler() {
 	}
 }
 
-func (dp *MyDisplayPane) SetRenderChannel(rc chan swtk.PaneImage) {
-	dp.renderChannel = rc
+func (dp *MyDisplayPane) SetRenderer(r swtk.Renderer) {
+	dp.renderer = r
 }
 
-func (pn *MyDisplayPane) Draw() chan int {
-	return pn.drawChannel
+func (pn *MyDisplayPane) Draw() {
+	pn.drawChannel <- 1
 }
 
 func (pn *MyDisplayPane) draw() {
 	if pn.im != nil {
 		draw.Draw(pn.im, pn.im.Bounds(), &image.Uniform{pn.col}, image.ZP, draw.Src)
 	}
-	pn.renderChannel <- swtk.PaneImage{pn.thePane, pn.im}
+	pn.renderer.SetAspect(swtk.PaneImage{pn.thePane, pn.im})
 }

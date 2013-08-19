@@ -51,14 +51,14 @@ func (pn *GridLayoutPane) HandleResizeEvent(re image.Point) {
 			p.Y = max.Y
 		}
 
-		pn.renderer.RefreshLocationChannel() <- swtk.PaneCoords{child, c}
-		child.ResizeChannel() <- p
+		pn.renderer.SetLocation(swtk.PaneCoords{child, c, p})
+		child.SetSize(p)
 	}
 }
 
-func (pn *GridLayoutPane) HandleCloseEvent(ce int) {
+func (pn *GridLayoutPane) HandleCloseEvent() {
 	for _, c := range pn.children {
-		c.CloseChannel() <- ce
+		c.Close()
 	}
 }
 
@@ -89,8 +89,8 @@ func (pn *GridLayoutPane) AddPane(pane swtk.Pane, x, y int) {
 	}
 
 	if pane.DisplayPane() != nil {
-		pane.DisplayPane().SetRenderChannel(pn.renderer.UpdateNotifyChannel())
+		pane.DisplayPane().SetRenderer(pn.renderer)
 	}
 
-	go pane.EventHandler()
+	go pane.PaneHandler()
 }

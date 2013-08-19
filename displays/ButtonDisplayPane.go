@@ -10,7 +10,7 @@ type ButtonDisplayPane struct {
 	thePane       swtk.Pane
 	im            draw.Image
 	col           color.Color
-	renderChannel chan swtk.PaneImage
+	renderer      swtk.Renderer
 	bTop          image.Image
 	bBottom       image.Image
 	mask          image.Image
@@ -48,12 +48,12 @@ func (dp *ButtonDisplayPane) SetState() chan int {
 	return dp.stateChannel
 }
 
-func (dp *ButtonDisplayPane) SetSize() chan image.Point {
-	return dp.sizeChannel
+func (dp *ButtonDisplayPane) SetSize(size image.Point) {
+	dp.sizeChannel <- size
 }
 
-func (dp *ButtonDisplayPane) CloseChannel() chan int {
-	return dp.closeChannel
+func (dp *ButtonDisplayPane) Close() {
+	dp.closeChannel <- 1
 }
 
 func (dp *ButtonDisplayPane) setSize(s image.Point) {
@@ -81,12 +81,12 @@ func (dp *ButtonDisplayPane) DrawingHandler() {
 	}
 }
 
-func (pn *ButtonDisplayPane) Draw() chan int {
-	return pn.drawChannel
+func (pn *ButtonDisplayPane) Draw() {
+	pn.drawChannel <- 1
 }
 
-func (dp *ButtonDisplayPane) SetRenderChannel(rc chan swtk.PaneImage) {
-	dp.renderChannel = rc
+func (dp *ButtonDisplayPane) SetRenderer(r swtk.Renderer) {
+	dp.renderer = r
 }
 
 func (pn *ButtonDisplayPane) draw() {
@@ -128,5 +128,5 @@ func (pn *ButtonDisplayPane) draw() {
 			draw.DrawMask(pn.im, r, image.Black, image.ZP, pn.mask, image.ZP, draw.Over)
 		}
 	}
-	pn.renderChannel <- swtk.PaneImage{pn.thePane, pn.im}
+	pn.renderer.SetAspect(swtk.PaneImage{pn.thePane, pn.im})
 }

@@ -5,6 +5,7 @@ import "image"
 type PaneCoords struct {
 	Pane   Pane
 	Coords image.Point
+	Size   image.Point
 }
 
 type PaneImage struct {
@@ -19,13 +20,16 @@ type Pane interface {
 	MinMax() (image.Point, image.Point)
 	SetMinMax(min, max image.Point)
 
-	//resize events are treated as absolute, no negotiating on size
-	ResizeChannel() chan image.Point
-	CloseChannel() chan int
+	SetSize(size image.Point)
+	Close()
 
 	//Event handling
-	MouseStateChannel() chan MouseState
-	//GetKeyboardInputChan() chan int
+	SetMouseState(ms MouseState)
+	//SetPointerState(ps PointerState)
+	//SetContactState(cs ContactState)
+
+	//Panes only need to know about focus, the inputHandler will take care of keyboard events
+	//SetFocusState(fs FocusState)
 
 	SetLayoutPane(lp LayoutPane)
 	LayoutPane() LayoutPane
@@ -36,16 +40,16 @@ type Pane interface {
 	SetInputHandler(ih InputHandler)
 	InputHandler() InputHandler
 
-	EventHandler()
+	PaneHandler()
 }
 
 type DisplayPane interface {
 	SetPane(pane Pane)
-	SetRenderChannel(chan PaneImage)
+	SetRenderer(r Renderer)
 
-	Draw() chan int
-	SetSize() chan image.Point
-	CloseChannel() chan int
+	Draw()
+	SetSize(size image.Point)
+	Close()
 
 	DrawingHandler()
 }
@@ -54,7 +58,7 @@ type DisplayPane interface {
 type LayoutPane interface {
 	SetPane(pane Pane)
 	HandleResizeEvent(re image.Point)
-	HandleCloseEvent(ce int)
+	HandleCloseEvent()
 	RegisterRenderer(wr Renderer)
 
 	//This initializes pane
@@ -64,20 +68,41 @@ type LayoutPane interface {
 
 type Renderer interface {
 	RegisterPane(pane Pane, parentPane Pane)
-	UpdateNotifyChannel() chan PaneImage
-	RefreshLocationChannel() chan PaneCoords
+	SetAspect(pi PaneImage)
+	SetLocation(pc PaneCoords)
 	SetBasePane(pane Pane)
 	Run()
 	BackEndRun()
+
+	//RequestFocus(pn Pane)
 }
 
 type InputHandler interface {
 	SetPane(pn Pane)
-	HandleMouseState() chan MouseState
+	HandleMouseState(ms MouseState)
+	//	HandlePointerState(ps PointerState)
+	//	HandleContactState(cs ContactState)
 	InputHandler()
 }
 
 type MouseState struct {
 	B    int8
 	X, Y int16
+}
+
+//This is where on screen the pointer is
+//There may be multiple pointers from multiple Devices
+type PointerState struct {
+	Device int
+	Id     int
+	X, Y   int
+}
+
+//This is where on screen has been 'touched'
+// ie: with finger, or mouse button down
+//There will certainly be multiple contacts from multiple Devices
+type ContactState struct {
+	Device int
+	Id     int
+	X, Y   int
 }

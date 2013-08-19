@@ -1,6 +1,6 @@
 package renderers
 
-import "fmt"
+import "log"
 import "image"
 import "github.com/skelterjohn/go.wde"
 import _ "github.com/skelterjohn/go.wde/init"
@@ -13,6 +13,7 @@ type paneNode struct {
 	parent   *paneNode
 	im       draw.Image
 	x, y     int
+	dx, dy   int
 	pane     swtk.Pane
 }
 
@@ -28,6 +29,7 @@ type wdeRenderer struct {
 	bgImage     image.Image
 	mouseState  swtk.MouseState
 	mousePane   swtk.Pane
+	pointerPanes map[image.Point]swtk.Pane
 }
 
 func NewWdeRenderer(title string, bg color.Color) *wdeRenderer {
@@ -49,6 +51,8 @@ func NewWdeRenderer(title string, bg color.Color) *wdeRenderer {
 
 	wr.mouseState = swtk.MouseState{int8(-1), int16(-1), int16(-1)}
 
+	wr.pointerPanes = make(map[image.Point]swtk.Pane)
+
 	return wr
 }
 
@@ -65,7 +69,7 @@ func (wr *wdeRenderer) Run() {
 			} else {
 				switch e := e.(type) {
 				case wde.CloseEvent:
-					wr.basePane.CloseChannel() <- 1
+					wr.basePane.Close()
 					wr.wdeWindow.Close()
 					wde.Stop()
 					return
@@ -74,7 +78,7 @@ func (wr *wdeRenderer) Run() {
 					if (x != 0) && (y != 0) {
 						re := image.Point{wr.wdeWindow.Screen().Bounds().Dx(), wr.wdeWindow.Screen().Bounds().Dy()}
 						wr.handleWindowResize()
-						wr.basePane.ResizeChannel() <- re
+						wr.basePane.SetSize(re)
 					}
 				case wde.MouseDownEvent:
 					me := swtk.MouseState{int8(e.Which) | wr.mouseState.B, int16(e.Where.X), int16(e.Where.Y)}
@@ -97,7 +101,7 @@ func (wr *wdeRenderer) Run() {
 				case wde.KeyDownEvent:
 				case wde.KeyUpEvent:
 				case wde.KeyTypedEvent:
-					fmt.Println(e.Key, e.Glyph, e.Chord)
+					log.Println(e.Key, e.Glyph, e.Chord)
 				default:
 				}
 			}
@@ -119,13 +123,13 @@ func (wr *wdeRenderer) Run() {
 			}
 			wr.render()
 		case pc := <-wr.panesCoords:
-			wr.refreshLocation(pc.Pane, pc.Coords)
+			wr.refreshLocation(pc.Pane, pc.Coords, pc.Size)
 			cond := true
 			//count := cap(wr.panesCoords)
 			for cond {
 				select {
 				case pc2 := <-wr.panesCoords:
-					wr.refreshLocation(pc2.Pane, pc2.Coords)
+					wr.refreshLocation(pc2.Pane, pc2.Coords, pc2.Size)
 					/*count--
 					if count < 0 {
 						cond = false
@@ -140,48 +144,73 @@ func (wr *wdeRenderer) Run() {
 }
 
 func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
+	//mouse event - deprecated
 	if ms.B < 0 && ms.X < 0 {
 		//exit event
 		if wr.mousePane != nil {
-			wr.mousePane.MouseStateChannel() <- ms
+			wr.mousePane.SetMouseState(ms)
 		}
 		wr.mousePane = nil
 	} else {
-		currentNode := wr.renderList[0]
-		nextNode := currentNode
-		for {
-			nbChildren := len(currentNode.children) - 1
-			if nbChildren >= 0 {
-				for nbChildren >= 0 {
-					child := currentNode.children[nbChildren]
-					size := image.Point{0, 0}
-					if child.im != nil {
-						size = child.im.Bounds().Size()
-					}
-					if int(ms.X)-child.x >= 0 && int(ms.X)-child.x < size.X && int(ms.Y)-child.y >= 0 && int(ms.Y)-child.y < size.Y {
-						nextNode = currentNode.children[nbChildren]
-						nbChildren = -1
-					} else {
-						nbChildren = nbChildren - 1
-					}
-				}
-			}
-
-			if nextNode != currentNode {
-				currentNode = nextNode
-			} else {
-				if wr.mousePane != currentNode.pane && wr.mousePane != nil {
-					wr.mousePane.MouseStateChannel() <- swtk.MouseState{int8(-1), int16(-1), int16(-1)}
-					currentNode.pane.MouseStateChannel() <- swtk.MouseState{int8(-1), ms.X - int16(currentNode.x), ms.Y - int16(currentNode.y)}
-				}
-				currentNode.pane.MouseStateChannel() <- swtk.MouseState{ms.B, ms.X - int16(currentNode.x), ms.Y - int16(currentNode.y)}
-				wr.mousePane = currentNode.pane
-				break
-			}
+		targetNode := wr.findNode(int(ms.X), int(ms.Y))
+		if wr.mousePane != targetNode.pane && wr.mousePane != nil {
+			//Pointer Exit Event (ie, -Id, -1, -1 coordinates)
+			wr.mousePane.SetMouseState(swtk.MouseState{int8(-1), int16(-1), int16(-1)})
+			//Pointer Enter Event (Doesn't need to exist...)
+			targetNode.pane.SetMouseState(swtk.MouseState{int8(-1), ms.X - int16(targetNode.x), ms.Y - int16(targetNode.y)})
 		}
+		//make Pointer Event
+		targetNode.pane.SetMouseState(swtk.MouseState{ms.B, ms.X - int16(targetNode.x), ms.Y - int16(targetNode.y)})
+		//make contact Event
+		wr.mousePane = targetNode.pane
+	}
+
+	//handle pointer event from Mouse
+	if ms.X < int16(0) {
+		//create exit pointer
+		if wr.pointerPanes[image.Point{0,0}] != nil {
+			p := swtk.PointerState{0,0, -1, -1}
+			log.Println(p)
+			wr.pointerPanes[image.Point{0,0}] = nil
+		}
+	} else {
+		targetNode := wr.findNode(int(ms.X), int(ms.Y))
+		if wr.pointerPanes[image.Point{0,0}] != targetNode.pane && wr.pointerPanes[image.Point{0,0}] != nil {
+			po := swtk.PointerState{0,0, -1, -1}
+			log.Println(po)
+		}
+		pi := swtk.PointerState{0,0, int(ms.X) - targetNode.x, int(ms.Y) - targetNode.y}
+		log.Println(pi)
+
+		wr.pointerPanes[image.ZP] = targetNode.pane
 	}
 	wr.mouseState = ms
+}
 
+func (wr *wdeRenderer) findNode(x, y int) *paneNode {
+	currentNode := wr.renderList[0]
+	nextNode := currentNode
+	for {
+		nbChildren := len(currentNode.children) - 1
+		if nbChildren >= 0 {
+			for nbChildren >= 0 {
+				child := currentNode.children[nbChildren]
+				if x-child.x >= 0 && x - child.x < child.dx && y - child.y >= 0 && y - child.y < child.dy {
+					nextNode = currentNode.children[nbChildren]
+					nbChildren = -1
+				} else {
+					nbChildren = nbChildren - 1
+				}
+			}
+		}
+
+		if nextNode != currentNode {
+			currentNode = nextNode
+		} else {
+			break
+		}
+	}
+	return currentNode
 }
 
 func (wr *wdeRenderer) RegisterPane(pane swtk.Pane, parentPane swtk.Pane) {
@@ -216,16 +245,18 @@ func (wr *wdeRenderer) SetBasePane(pane swtk.Pane) {
 		pane.LayoutPane().RegisterRenderer(wr)
 	}
 	if pane.DisplayPane() != nil {
-		pane.DisplayPane().SetRenderChannel(wr.panesCom)
+		pane.DisplayPane().SetRenderer(wr)
 	}
 	wr.renderList = buildRenderList(wr.paneMap[wr.basePane], nil)
-	go wr.basePane.EventHandler()
+	go wr.basePane.PaneHandler()
 }
 
-func (wr *wdeRenderer) refreshLocation(pane swtk.Pane, point image.Point) {
+func (wr *wdeRenderer) refreshLocation(pane swtk.Pane, point image.Point, sizes image.Point) {
 	node := wr.paneMap[pane]
 	node.x = node.parent.x + point.X
 	node.y = node.parent.y + point.Y
+	node.dx = sizes.X
+	node.dy = sizes.Y
 }
 
 func (wr *wdeRenderer) refreshBuffer(pane swtk.Pane, im image.Image) {
@@ -240,12 +271,12 @@ func (wr *wdeRenderer) refreshBuffer(pane swtk.Pane, im image.Image) {
 	}
 }
 
-func (wr *wdeRenderer) UpdateNotifyChannel() chan swtk.PaneImage {
-	return wr.panesCom
+func (wr *wdeRenderer) SetAspect(im swtk.PaneImage) {
+	wr.panesCom <-im
 }
 
-func (wr *wdeRenderer) RefreshLocationChannel() chan swtk.PaneCoords {
-	return wr.panesCoords
+func (wr *wdeRenderer) SetLocation(pc swtk.PaneCoords) {
+	wr.panesCoords <- pc
 }
 
 func (wr *wdeRenderer) render() {
@@ -266,6 +297,8 @@ func (wr *wdeRenderer) handleWindowResize() {
 			src.im = nil
 			src.x = 0
 			src.y = 0
+			src.dx = 0
+			src.dy = 0
 		}
 	}
 }

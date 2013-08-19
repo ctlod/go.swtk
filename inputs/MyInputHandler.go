@@ -36,8 +36,8 @@ func (ih *MyInputHandler) InputHandler() {
 	}
 }
 
-func (ih *MyInputHandler) HandleMouseState() chan swtk.MouseState {
-	return ih.mouseStateChannel
+func (ih *MyInputHandler) HandleMouseState(ms swtk.MouseState) {
+	ih.mouseStateChannel <- ms
 }
 
 
@@ -48,13 +48,13 @@ func (ih *MyInputHandler) handleMouseState(mse swtk.MouseState) {
 			//check if left click is released
 			if ih.ms.B > int8(0) && (ih.ms.B&int8(1)) == int8(1) && (mse.B < int8(0) || (mse.B&int8(1)) == int8(0)) {
 				theDisplayPane.SetColor() <- ih.col1
-				theDisplayPane.Draw() <- 1
+				theDisplayPane.Draw()
 			}
 
 			//check if left click is pressed (ignore if mouse enters pressed)
 			if mse.B > int8(0) && (mse.B&int8(1) == int8(1)) && (ih.ms.B >= int8(0) && (ih.ms.B&int8(1)) == int8(0)) {
 				theDisplayPane.SetColor() <- ih.col2
-				theDisplayPane.Draw() <- 1
+				theDisplayPane.Draw()
 			}
 		}
 	}

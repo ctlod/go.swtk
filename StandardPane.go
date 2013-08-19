@@ -53,24 +53,24 @@ func (pn *StandardPane) SetDisplayPane(dp DisplayPane) {
 	go dp.DrawingHandler()
 }
 
-func (pn *StandardPane) ResizeChannel() chan image.Point {
-	return pn.resizeChan
+func (pn *StandardPane) SetSize(size image.Point) {
+	pn.resizeChan <- size
 }
 
-func (pn *StandardPane) CloseChannel() chan int {
-	return pn.closeChan
+func (pn *StandardPane) Close() {
+	pn.closeChan <- 1
 }
 
-func (pn *StandardPane) MouseStateChannel() chan MouseState {
-	return pn.mouseStateChan
+func (pn *StandardPane) SetMouseState(ms MouseState) {
+	pn.mouseStateChan <- ms
 }
 
-func (pn *StandardPane) EventHandler() {
+func (pn *StandardPane) PaneHandler() {
 	for {
 		select {
 		case me := <-pn.mouseStateChan:
 			if pn.inputHandler != nil {
-				pn.inputHandler.HandleMouseState() <- me
+				pn.inputHandler.HandleMouseState(me)
 			}
 		case re := <-pn.resizeChan:
 			//only treat last resize in a batch
@@ -86,11 +86,11 @@ func (pn *StandardPane) EventHandler() {
 				pn.layoutPane.HandleResizeEvent(re)
 			}
 			if pn.displayPane != nil {
-				pn.displayPane.SetSize() <- re
+				pn.displayPane.SetSize(re)
 			}
-		case ce := <-pn.closeChan:
+		case _ = <-pn.closeChan:
 			if pn.layoutPane != nil {
-				pn.layoutPane.HandleCloseEvent(ce)
+				pn.layoutPane.HandleCloseEvent()
 			}
 			break
 		}

@@ -11,7 +11,7 @@ type LabelDisplayPane struct {
 	thePane       swtk.Pane
 	im            draw.Image
 	fg            image.Image
-	renderChannel chan swtk.PaneImage
+	renderer  swtk.Renderer
 	drawChannel   chan int
 	sizeChannel   chan image.Point
 	closeChannel chan int
@@ -42,12 +42,12 @@ func (pn *LabelDisplayPane) SetPane(p swtk.Pane) {
 	pn.thePane = p
 }
 
-func (dp *LabelDisplayPane) SetSize() chan image.Point {
-	return dp.sizeChannel
+func (dp *LabelDisplayPane) SetSize(size image.Point) {
+	dp.sizeChannel <- size
 }
 
-func (dp *LabelDisplayPane) CloseChannel() chan int {
-	return dp.closeChannel
+func (dp *LabelDisplayPane) Close() {
+	dp.closeChannel <- 1
 }
 
 func (dp *LabelDisplayPane) setSize(s image.Point) {
@@ -72,12 +72,12 @@ func (dp *LabelDisplayPane) DrawingHandler() {
 	}
 }
 
-func (pn *LabelDisplayPane) Draw() chan int {
-	return pn.drawChannel
+func (pn *LabelDisplayPane) Draw() {
+	pn.drawChannel <- 1
 }
 
-func (dp *LabelDisplayPane) SetRenderChannel(rc chan swtk.PaneImage) {
-	dp.renderChannel = rc
+func (dp *LabelDisplayPane) SetRenderer(r swtk.Renderer) {
+	dp.renderer = r
 }
 
 func (pn *LabelDisplayPane) draw() {
@@ -95,5 +95,5 @@ func (pn *LabelDisplayPane) draw() {
 		draw.Draw(pn.im, r, image.Transparent, image.ZP, draw.Src)
 		pn.ftContext.DrawString(pn.label, pt)
 	}
-	pn.renderChannel <- swtk.PaneImage{pn.thePane, pn.im}
+	pn.renderer.SetAspect(swtk.PaneImage{pn.thePane, pn.im})
 }
