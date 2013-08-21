@@ -30,7 +30,6 @@ func (pn *StandardPane) LayoutPane() LayoutPane {
 
 func (pn *StandardPane) SetLayoutPane(lp LayoutPane) {
 	pn.layoutPane = lp
-	lp.SetPane(pn)
 }
 
 func (pn *StandardPane) InputHandler() InputHandler {
@@ -39,8 +38,6 @@ func (pn *StandardPane) InputHandler() InputHandler {
 
 func (pn *StandardPane) SetInputHandler(ih InputHandler) {
 	pn.inputHandler = ih
-	ih.SetPane(pn)
-	go ih.InputHandler()
 }
 
 func (pn *StandardPane) DisplayPane() DisplayPane {
@@ -49,8 +46,6 @@ func (pn *StandardPane) DisplayPane() DisplayPane {
 
 func (pn *StandardPane) SetDisplayPane(dp DisplayPane) {
 	pn.displayPane = dp
-	dp.SetPane(pn)
-	go dp.DrawingHandler()
 }
 
 func (pn *StandardPane) SetSize(size image.Point) {

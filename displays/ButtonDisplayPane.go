@@ -9,10 +9,9 @@ import "github.com/ctlod/go.swtk"
 type ButtonDisplayPane struct {
 	thePane       swtk.Pane
 	im            draw.Image
-	col           color.Color
 	renderer      swtk.Renderer
-	bTop          image.Image
-	bBottom       image.Image
+	fg          image.Image
+	bg       image.Image
 	mask          image.Image
 	highlightWidth   int
 	shadowWidth   int
@@ -21,14 +20,14 @@ type ButtonDisplayPane struct {
 	closeChannel chan int
 	stateChannel chan int
 	state int
+	ftContext *freetype.Context
 	label string
 }
 
-func NewButtonDisplayPane(a, b int, c color.Color) *ButtonDisplayPane {
+func NewButtonDisplayPane(bgc, fgc color.Color, label string) *ButtonDisplayPane {
 	pn := new(ButtonDisplayPane)
-	pn.col = c
-	pn.bTop = image.White
-	pn.bBottom = image.Black
+	pn.bg = image.NewUniform(bgc)
+	pn.fg = image.NewUniform(fgc)
 	pn.mask = image.NewUniform(color.Alpha{128})
 	pn.highlightWidth = 2
 	pn.sizeChannel = make(chan image.Point, 1)
@@ -36,7 +35,14 @@ func NewButtonDisplayPane(a, b int, c color.Color) *ButtonDisplayPane {
 	pn.closeChannel = make(chan int, 1)
 	pn.stateChannel = make(chan int, 1)
 	pn.state = 0
-	pn.label = "Button"
+	pn.label = label
+	
+	pn.ftContext = freetype.NewContext()
+	pn.ftContext.SetDPI(swtk.Dpi)
+	pn.ftContext.SetFont(swtk.Font)
+	pn.ftContext.SetFontSize(swtk.FontSize)
+	pn.ftContext.SetSrc(pn.fg)
+
 	return pn
 }
 
@@ -44,8 +50,8 @@ func (pn *ButtonDisplayPane) SetPane(p swtk.Pane) {
 	pn.thePane = p
 }
 
-func (dp *ButtonDisplayPane) SetState() chan int {
-	return dp.stateChannel
+func (dp *ButtonDisplayPane) SetState(s int) {
+	dp.stateChannel <- s
 }
 
 func (dp *ButtonDisplayPane) SetSize(size image.Point) {
@@ -92,23 +98,17 @@ func (dp *ButtonDisplayPane) SetRenderer(r swtk.Renderer) {
 func (pn *ButtonDisplayPane) draw() {
 	if pn.im != nil {
 		r := pn.im.Bounds()
-		t := freetype.NewContext()
-		t.SetDPI(swtk.Dpi)
-		t.SetFont(swtk.Font)
-		t.SetFontSize(swtk.FontSize)
-		t.SetClip(r)
-		t.SetDst(pn.im)
-		t.SetSrc(image.Black)
+		pn.ftContext.SetClip(r)
+		pn.ftContext.SetDst(pn.im)
 
-		fHeight := int(t.PointToFix32(swtk.FontSize)>>8)
-		pt := freetype.Pt(0, fHeight)
-		pt1, _ := t.DrawString(pn.label, pt)
-		lableLength := int(pt1.X >> 8)
+		textHeight := int(pn.ftContext.PointToFix32(swtk.FontSize)>>8)
+		pt := freetype.Pt(0, textHeight)
+		pt, _ = pn.ftContext.DrawString(pn.label, pt)
+		lableLength := int(pt.X >> 8)
+		pt = freetype.Pt((r.Dx() - lableLength)  / 2, (r.Dy() + textHeight) / 2 - 1)
 
-		pt1 = freetype.Pt((r.Dx() - lableLength)  / 2, (r.Dy() + fHeight) / 2 - 1)
-
-		draw.Draw(pn.im, r, &image.Uniform{pn.col}, image.ZP, draw.Src)
-		t.DrawString(pn.label, pt1)
+		draw.Draw(pn.im, r, pn.bg, image.ZP, draw.Src)
+		pn.ftContext.DrawString(pn.label, pt)
 
 		if pn.state > 0 {
 			r0 := image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y + pn.highlightWidth)
