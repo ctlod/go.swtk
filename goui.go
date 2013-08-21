@@ -5,6 +5,8 @@ import "io/ioutil"
 import "code.google.com/p/freetype-go/freetype"
 import "code.google.com/p/freetype-go/freetype/truetype"
 import "log"
+import "image"
+import "image/draw"
 
 var (
 	Dpi         float64
@@ -32,4 +34,55 @@ func init() {
 		return
 	}
 	Font = font1
+}
+
+type PaneCoords struct {
+	Pane   Pane
+	Coords image.Point
+	Size   image.Point
+}
+
+type PaneImage struct {
+	Pane  Pane
+	Image draw.Image
+}
+
+type alignment int
+
+func (a alignment) Alignment() alignment {
+	return a
+}
+
+const (
+	AlignCenter alignment = iota
+	AlignCenterLeft
+	AlignCenterRight
+	AlignTop
+	AlignTopLeft
+	AlignTopRight
+	AlignBottom
+	AlignBottomLeft
+	AlignBottomRight
+)
+
+type MouseState struct {
+	B    int8
+	X, Y int16
+}
+
+//This is where on screen the pointer is
+//There may be multiple pointers from multiple Devices
+type PointerState struct {
+	Device int
+	Id     int
+	X, Y   int
+}
+
+//This is where on screen has been 'touched'
+// ie: with finger, or mouse button down
+//There will certainly be multiple contacts from multiple Devices
+type ContactState struct {
+	Device int
+	Id     int
+	X, Y   int
 }

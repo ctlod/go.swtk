@@ -3,6 +3,8 @@ package layouts
 import "image"
 import "github.com/ctlod/go.swtk"
 
+
+
 type GridLayoutPane struct {
 	thePane  swtk.Pane
 	renderer swtk.Renderer
@@ -11,6 +13,7 @@ type GridLayoutPane struct {
 	sizes    map[swtk.Pane]*image.Point
 	paneCell map[swtk.Pane]*image.Point
 	gridCell map[image.Point]swtk.Pane
+	gridAlign map[image.Point]swtk.Alignmenter
 	gridSize image.Point
 	size     image.Point
 }
@@ -20,6 +23,7 @@ func NewGridLayoutPane() *GridLayoutPane {
 	pn.sizes = make(map[swtk.Pane]*image.Point)
 	pn.paneCell = make(map[swtk.Pane]*image.Point)
 	pn.gridCell = make(map[image.Point]swtk.Pane)
+	pn.gridAlign = make(map[image.Point]swtk.Alignmenter)
 	pn.gridSize = image.Point{0, 0}
 	return pn
 }
@@ -51,6 +55,26 @@ func (pn *GridLayoutPane) HandleResizeEvent(re image.Point) {
 			p.Y = max.Y
 		}
 
+		a := pn.gridAlign[*cell]
+
+		//Align horizontally
+		if (p.X < gc_w) {
+			if (a == swtk.AlignCenter || a== swtk.AlignTop || a == swtk.AlignBottom) {
+				c.X = c.X + (gc_w - p.X) / 2
+			} else if (a == swtk.AlignCenterRight || a== swtk.AlignTopRight || a == swtk.AlignBottomRight) {
+				c.X = c.X + (gc_w - p.X)
+			}
+		}
+
+		//Align Vertically
+		if (p.Y < gc_h) {
+			if (a == swtk.AlignCenter || a== swtk.AlignCenterLeft || a == swtk.AlignCenterRight) {
+				c.Y = c.Y + (gc_h - p.Y) / 2
+			} else if (a == swtk.AlignBottom || a== swtk.AlignBottomLeft || a == swtk.AlignBottomRight) {
+				c.Y = c.Y + (gc_h - p.Y)
+			}
+		}
+
 		pn.renderer.SetLocation(swtk.PaneCoords{child, c, p})
 		child.SetSize(p)
 	}
@@ -80,8 +104,10 @@ func (pn *GridLayoutPane) AddPane(pane swtk.Pane, x, y int) {
 	}
 
 	pn.children = append(pn.children, pane)
-	pn.paneCell[pane] = &image.Point{x, y}
-	pn.gridCell[*pn.paneCell[pane]] = pane
+	p := image.Point{x, y}
+	pn.paneCell[pane] = &p
+	pn.gridCell[p] = pane
+	pn.gridAlign[p] = swtk.AlignCenter
 	pn.renderer.RegisterPane(pane, pn.thePane)
 
 	if pane.LayoutPane() != nil {
@@ -93,4 +119,9 @@ func (pn *GridLayoutPane) AddPane(pane swtk.Pane, x, y int) {
 	}
 
 	go pane.PaneHandler()
+}
+
+func (pn *GridLayoutPane) SetAlignment(p swtk.Pane, a swtk.Alignmenter) {
+	c := pn.paneCell[p]
+	pn.gridAlign[*c] = a
 }

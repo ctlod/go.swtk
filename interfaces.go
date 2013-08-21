@@ -1,18 +1,6 @@
 package swtk
 
 import "image"
-import "image/draw"
-
-type PaneCoords struct {
-	Pane   Pane
-	Coords image.Point
-	Size   image.Point
-}
-
-type PaneImage struct {
-	Pane  Pane
-	Image draw.Image
-}
 
 type Pane interface {
 	//return minimum and maximum sizes desired
@@ -55,6 +43,10 @@ type DisplayPane interface {
 	DrawingHandler()
 }
 
+type Alignmenter interface {
+	Alignment() alignment
+}
+
 // This handles children size and location
 type LayoutPane interface {
 	SetPane(pane Pane)
@@ -65,6 +57,7 @@ type LayoutPane interface {
 	//This initializes pane
 	//no further setup should be possible afterwards
 	AddPane(pane Pane, x, y int)
+	SetAlignment(pane Pane, a Alignmenter)
 }
 
 type Renderer interface {
@@ -86,24 +79,3 @@ type InputHandler interface {
 	InputHandler()
 }
 
-type MouseState struct {
-	B    int8
-	X, Y int16
-}
-
-//This is where on screen the pointer is
-//There may be multiple pointers from multiple Devices
-type PointerState struct {
-	Device int
-	Id     int
-	X, Y   int
-}
-
-//This is where on screen has been 'touched'
-// ie: with finger, or mouse button down
-//There will certainly be multiple contacts from multiple Devices
-type ContactState struct {
-	Device int
-	Id     int
-	X, Y   int
-}
