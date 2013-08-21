@@ -1,6 +1,7 @@
 package swtk
 
 import "image"
+import "image/draw"
 
 type PaneCoords struct {
 	Pane   Pane
@@ -10,7 +11,7 @@ type PaneCoords struct {
 
 type PaneImage struct {
 	Pane  Pane
-	Image image.Image
+	Image draw.Image
 }
 
 type Pane interface {
