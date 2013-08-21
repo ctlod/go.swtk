@@ -61,6 +61,7 @@ func (wr *wdeRenderer) BackEndRun() {
 }
 
 func (wr *wdeRenderer) Run() {
+	wr.handleWindowResize()
 	for {
 		select {
 		case e, ok := <-wr.wdeWindow.EventChan():
@@ -107,44 +108,37 @@ func (wr *wdeRenderer) Run() {
 			}
 		case pn := <-wr.panesCom:
 			wr.refreshBuffer(pn.Pane, pn.Image)
-			cond := true
-			//count := cap(wr.panesCom)
-			for cond {
+			p := wr.paneMap[pn.Pane]
+			r := pn.Image.Bounds().Add(image.Point{p.x, p.y})
+			rr := r
+			panesCom:for {
 				select {
-				case pn2 := <-wr.panesCom:
-					wr.refreshBuffer(pn2.Pane, pn2.Image)
-					/*count--
-					if count < 0 {
-						cond = false
-					}*/
+				case pn = <-wr.panesCom:
+					wr.refreshBuffer(pn.Pane, pn.Image)
+					p = wr.paneMap[pn.Pane]
+					r = pn.Image.Bounds().Add(image.Point{p.x, p.y})
+					rr = rr.Union(r)
 				default:
-					cond = false
+					break panesCom
 				}
 			}
-			wr.render()
+			wr.render(rr)
 		case pc := <-wr.panesCoords:
 			wr.refreshLocation(pc.Pane, pc.Coords, pc.Size)
-			cond := true
-			//count := cap(wr.panesCoords)
-			for cond {
+			panesCoords:for {
 				select {
-				case pc2 := <-wr.panesCoords:
-					wr.refreshLocation(pc2.Pane, pc2.Coords, pc2.Size)
-					/*count--
-					if count < 0 {
-						cond = false
-					}*/
+				case pc = <-wr.panesCoords:
+					wr.refreshLocation(pc.Pane, pc.Coords, pc.Size)
 				default:
-					cond = false
+					break panesCoords
 				}
 			}
-			wr.render()
 		}
 	}
 }
 
 func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
-	//mouse event - deprecated
+	//mouse event
 	if ms.B < 0 && ms.X < 0 {
 		//exit event
 		if wr.mousePane != nil {
@@ -165,6 +159,7 @@ func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
 		wr.mousePane = targetNode.pane
 	}
 
+	/*
 	//handle pointer event from Mouse
 	if ms.X < int16(0) {
 		//create exit pointer
@@ -181,9 +176,9 @@ func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
 		}
 		pi := swtk.PointerState{0,0, int(ms.X) - targetNode.x, int(ms.Y) - targetNode.y}
 		log.Println(pi)
-
 		wr.pointerPanes[image.ZP] = targetNode.pane
 	}
+	*/
 	wr.mouseState = ms
 }
 
@@ -259,16 +254,9 @@ func (wr *wdeRenderer) refreshLocation(pane swtk.Pane, point image.Point, sizes 
 	node.dy = sizes.Y
 }
 
-func (wr *wdeRenderer) refreshBuffer(pane swtk.Pane, im image.Image) {
+func (wr *wdeRenderer) refreshBuffer(pane swtk.Pane, im draw.Image) {
 	node := wr.paneMap[pane]
-	if im == nil {
-		node.im = nil
-	} else {	
-		if node.im == nil || node.im.Bounds() != im.Bounds() {
-			node.im = image.NewRGBA(im.Bounds())
-		}
-		draw.Draw(node.im, node.im.Bounds(), im, im.Bounds().Min, draw.Src)
-	}
+	node.im = im
 }
 
 func (wr *wdeRenderer) SetAspect(im swtk.PaneImage) {
@@ -279,28 +267,27 @@ func (wr *wdeRenderer) SetLocation(pc swtk.PaneCoords) {
 	wr.panesCoords <- pc
 }
 
-func (wr *wdeRenderer) render() {
-	draw.Draw(wr.wdeWindow.Screen(), wr.wdeWindow.Screen().Bounds(), wr.bgImage, image.Point{0, 0}, draw.Src)
+func (wr *wdeRenderer) render(section image.Rectangle) {
+	draw.Draw(wr.wdeWindow.Screen(), section, wr.bgImage, image.ZP.Sub(section.Min), draw.Src)
 	for _, src := range wr.renderList {
-		if src.im != nil {
-			dp := image.Point{src.x, src.y}
-			r := image.Rectangle{dp, dp.Add(src.im.Bounds().Size())}
-			draw.Draw(wr.wdeWindow.Screen(), r, src.im, src.im.Bounds().Min, draw.Over)
+		if src.im != nil && src.dx > 0 && src.dy > 0 {
+			orig := section.Min.Sub(image.Point{src.x, src.y})
+			draw.Draw(wr.wdeWindow.Screen(), section, src.im, orig, draw.Over)
 		}
 	}
-	wr.wdeWindow.FlushImage(wr.wdeWindow.Screen().Bounds())
+	wr.wdeWindow.FlushImage(section)
 }
 
 func (wr *wdeRenderer) handleWindowResize() {
 	for _, src := range wr.renderList {
-		if src.im != nil {
-			src.im = nil
-			src.x = 0
-			src.y = 0
-			src.dx = 0
-			src.dy = 0
-		}
+		src.im = nil
+		src.x = 0
+		src.y = 0
+		src.dx = 0
+		src.dy = 0
 	}
+	draw.Draw(wr.wdeWindow.Screen(), wr.wdeWindow.Screen().Bounds(), wr.bgImage, image.ZP, draw.Src)
+	wr.wdeWindow.FlushImage(wr.wdeWindow.Screen().Bounds())
 }
 
 func buildRenderList(pn *paneNode, list []*paneNode) []*paneNode {
