@@ -13,17 +13,20 @@ type LabelDisplayPane struct {
 	fg            image.Image
 	renderer  swtk.Renderer
 	drawChannel   chan int
-	sizeChannel   chan image.Point
+	sizeChannel   chan swtk.ResizeEvent
 	closeChannel chan int
 	stateChannel chan int
 	ftContext *freetype.Context
 	label string
+	size						image.Point
+	view						image.Rectangle
+	ftim						draw.Image
 }
 
 func NewLabelDisplayPane(l string, c color.Color) *LabelDisplayPane {
 	pn := new(LabelDisplayPane)
 	pn.fg = image.NewUniform(c)
-	pn.sizeChannel = make(chan image.Point, 1)
+	pn.sizeChannel = make(chan swtk.ResizeEvent, 1)
 	pn.drawChannel = make(chan int, 1)
 	pn.closeChannel = make(chan int, 1)
 	pn.stateChannel = make(chan int, 1)
@@ -34,6 +37,8 @@ func NewLabelDisplayPane(l string, c color.Color) *LabelDisplayPane {
 	pn.ftContext.SetFontSize(swtk.FontSize)
 	pn.ftContext.SetSrc(pn.fg)
 
+	pn.ftim = image.NewRGBA(image.Rect(0,0,0,0))
+
 	pn.label = l
 	return pn
 }
@@ -42,7 +47,7 @@ func (pn *LabelDisplayPane) SetPane(p swtk.Pane) {
 	pn.thePane = p
 }
 
-func (dp *LabelDisplayPane) SetSize(size image.Point) {
+func (dp *LabelDisplayPane) SetSize(size swtk.ResizeEvent) {
 	dp.sizeChannel <- size
 }
 
@@ -50,12 +55,14 @@ func (dp *LabelDisplayPane) Close() {
 	dp.closeChannel <- 1
 }
 
-func (dp *LabelDisplayPane) setSize(s image.Point) {
-	//simply set the correct size in the buffer
-	if s.X == 0 || s.Y == 0 {
+func (dp *LabelDisplayPane) setSize(s swtk.ResizeEvent) {
+	//set the correct size in the buffer
+	dp.size = s.Size
+	dp.view = s.View
+	if s.Size.X == 0 || s.Size.Y == 0 {
 		dp.im = nil
 	}
-	dp.im = image.NewRGBA(image.Rect(0, 0, s.X, s.Y))
+	dp.im = image.NewRGBA(image.Rect(0, 0, s.View.Dx(), s.View.Dy()))
 }
 
 func (dp *LabelDisplayPane) DrawingHandler() {
@@ -83,16 +90,16 @@ func (dp *LabelDisplayPane) SetRenderer(r swtk.Renderer) {
 func (pn *LabelDisplayPane) draw() {
 	if pn.im != nil {
 		r := pn.im.Bounds()
-		pn.ftContext.SetClip(r)
-		pn.ftContext.SetDst(pn.im)
+		draw.Draw(pn.im, r, image.Transparent, image.ZP, draw.Src)
 
+		pn.ftContext.SetClip(image.Rect(0,0,pn.size.X,pn.size.Y))
+		pn.ftContext.SetDst(pn.ftim)
 		textHeight := int(pn.ftContext.PointToFix32(swtk.FontSize)>>8)
 		pt := freetype.Pt(0, textHeight)
 		pt, _ = pn.ftContext.DrawString(pn.label, pt)
-		lableLength := int(pt.X >> 8)
-		pt = freetype.Pt((r.Dx() - lableLength)  / 2, (r.Dy() + textHeight) / 2 - 1)
-
-		draw.Draw(pn.im, r, image.Transparent, image.ZP, draw.Src)
+		labelLength := int(pt.X >> 8)
+		pt = freetype.Pt((pn.size.X - labelLength)  / 2 - pn.view.Min.X, (pn.size.Y + textHeight) / 2 - 1 - pn.view.Min.Y)
+		pn.ftContext.SetDst(pn.im)
 		pn.ftContext.DrawString(pn.label, pt)
 	}
 	pn.renderer.SetAspect(swtk.PaneImage{pn.thePane, pn.im})

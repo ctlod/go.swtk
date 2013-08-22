@@ -77,9 +77,10 @@ func (wr *wdeRenderer) Run() {
 				case wde.ResizeEvent:
 					x, y := wr.wdeWindow.Size()
 					if (x != 0) && (y != 0) {
-						re := image.Point{wr.wdeWindow.Screen().Bounds().Dx(), wr.wdeWindow.Screen().Bounds().Dy()}
+						b := wr.wdeWindow.Screen().Bounds()
+						p := image.Point{b.Dx(), b.Dy()}
 						wr.handleWindowResize()
-						wr.basePane.SetSize(re)
+						wr.basePane.SetSize(swtk.ResizeEvent{p,b})
 					}
 				case wde.MouseDownEvent:
 					me := swtk.MouseState{int8(e.Which) | wr.mouseState.B, int16(e.Where.X), int16(e.Where.Y)}

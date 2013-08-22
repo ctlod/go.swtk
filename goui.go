@@ -47,6 +47,11 @@ type PaneImage struct {
 	Image draw.Image
 }
 
+type ResizeEvent struct {
+	Size image.Point
+	View image.Rectangle
+}
+
 type alignment int
 
 func (a alignment) Alignment() alignment {

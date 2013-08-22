@@ -23,27 +23,32 @@ func (pn *SimpleLayoutPane) RegisterRenderer(wr swtk.Renderer) {
 	pn.renderer = wr
 }
 
-func (pn *SimpleLayoutPane) HandleResizeEvent(re image.Point) {
-	pn.size = re
+func (pn *SimpleLayoutPane) HandleResizeEvent(re swtk.ResizeEvent) {
+	pn.size = re.Size
 	for _, child := range pn.children {
 		c := pn.coords[child]
-		p := image.Point{re.X - c.X, re.Y - c.Y}
+		origin := *c
+		size := image.Point{re.Size.X - origin.X, re.Size.Y - origin.Y}
 		min, max := child.MinMax()
 
-		if min.X > p.X {
-			p.X = 0
-		} else if max.X != 0 && max.X < p.X {
-			p.X = max.X
+		if min.X > size.X {
+			size.X = 0
+		} else if max.X != 0 && max.X < size.X {
+			size.X = max.X
 		}
 
-		if min.Y > p.Y {
-			p.Y = 0
-		} else if max.Y != 0 && max.Y < p.Y {
-			p.Y = max.Y
+		if min.Y > size.Y {
+			size.Y = 0
+		} else if max.Y != 0 && max.Y < size.Y {
+			size.Y = max.Y
 		}
 
-		pn.renderer.SetLocation(swtk.PaneCoords{child, *c, p})
-		child.SetSize(p)
+		//Work out view to tell child
+		p := image.Rect(0, 0, size.X, size.Y).Add(origin)
+		p = p.Intersect(re.View)
+
+		pn.renderer.SetLocation(swtk.PaneCoords{child, p.Min, size})
+		child.SetSize(swtk.ResizeEvent{size, p.Sub(origin)})
 	}
 }
 

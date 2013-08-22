@@ -11,7 +11,7 @@ type StandardPane struct {
 	maxSize image.Point
 
 	closeChan      chan int
-	resizeChan     chan image.Point
+	resizeChan     chan ResizeEvent
 	mouseStateChan chan MouseState
 }
 
@@ -48,7 +48,7 @@ func (pn *StandardPane) SetDisplayPane(dp DisplayPane) {
 	pn.displayPane = dp
 }
 
-func (pn *StandardPane) SetSize(size image.Point) {
+func (pn *StandardPane) SetSize(size ResizeEvent) {
 	pn.resizeChan <- size
 }
 
@@ -96,7 +96,7 @@ func NewStandardPane() *StandardPane {
 	pn := new(StandardPane)
 	pn.minSize = image.Point{0, 0}
 	pn.maxSize = image.Point{0, 0}
-	pn.resizeChan = make(chan image.Point, 100)
+	pn.resizeChan = make(chan ResizeEvent, 8)
 	pn.closeChan = make(chan int)
 	pn.mouseStateChan = make(chan MouseState)
 	return pn

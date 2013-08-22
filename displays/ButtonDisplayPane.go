@@ -7,21 +7,24 @@ import "code.google.com/p/freetype-go/freetype"
 import "github.com/ctlod/go.swtk"
 
 type ButtonDisplayPane struct {
-	thePane       swtk.Pane
-	im            draw.Image
-	renderer      swtk.Renderer
-	fg          image.Image
-	bg       image.Image
-	mask          image.Image
-	highlightWidth   int
-	shadowWidth   int
-	drawChannel   chan int
-	sizeChannel   chan image.Point
-	closeChannel chan int
-	stateChannel chan int
-	state int
-	ftContext *freetype.Context
-	label string
+	thePane       	swtk.Pane
+	im            	draw.Image
+	ftim						draw.Image
+	renderer      	swtk.Renderer
+	fg     	     		image.Image
+	bg       				image.Image
+	mask          	image.Image
+	highlightWidth  int
+	shadowWidth   	int
+	drawChannel   	chan int
+	sizeChannel   	chan swtk.ResizeEvent
+	closeChannel 		chan int
+	stateChannel 		chan int
+	state 					int
+	ftContext 			*freetype.Context
+	label 					string
+	size						image.Point
+	view						image.Rectangle
 }
 
 func NewButtonDisplayPane(bgc, fgc color.Color, label string) *ButtonDisplayPane {
@@ -30,7 +33,7 @@ func NewButtonDisplayPane(bgc, fgc color.Color, label string) *ButtonDisplayPane
 	pn.fg = image.NewUniform(fgc)
 	pn.mask = image.NewUniform(color.Alpha{128})
 	pn.highlightWidth = 2
-	pn.sizeChannel = make(chan image.Point, 1)
+	pn.sizeChannel = make(chan swtk.ResizeEvent, 1)
 	pn.drawChannel = make(chan int, 1)
 	pn.closeChannel = make(chan int, 1)
 	pn.stateChannel = make(chan int, 1)
@@ -43,6 +46,8 @@ func NewButtonDisplayPane(bgc, fgc color.Color, label string) *ButtonDisplayPane
 	pn.ftContext.SetFontSize(swtk.FontSize)
 	pn.ftContext.SetSrc(pn.fg)
 
+	pn.ftim = image.NewRGBA(image.Rect(0,0,0,0))
+
 	return pn
 }
 
@@ -54,7 +59,7 @@ func (dp *ButtonDisplayPane) SetState(s int) {
 	dp.stateChannel <- s
 }
 
-func (dp *ButtonDisplayPane) SetSize(size image.Point) {
+func (dp *ButtonDisplayPane) SetSize(size swtk.ResizeEvent) {
 	dp.sizeChannel <- size
 }
 
@@ -62,12 +67,14 @@ func (dp *ButtonDisplayPane) Close() {
 	dp.closeChannel <- 1
 }
 
-func (dp *ButtonDisplayPane) setSize(s image.Point) {
-	//simply set the correct size in the buffer
-	if s.X == 0 || s.Y == 0 {
+func (dp *ButtonDisplayPane) setSize(s swtk.ResizeEvent) {
+	//set the correct size in the buffer
+	dp.size = s.Size
+	dp.view = s.View
+	if s.View.Dx() == 0 || s.View.Dy() == 0 {
 		dp.im = nil
 	}
-	dp.im = image.NewRGBA(image.Rect(0, 0, s.X, s.Y))
+	dp.im = image.NewRGBA(image.Rect(0, 0, s.View.Dx(), s.View.Dy()))
 }
 
 func (dp *ButtonDisplayPane) DrawingHandler() {
@@ -98,29 +105,29 @@ func (dp *ButtonDisplayPane) SetRenderer(r swtk.Renderer) {
 func (pn *ButtonDisplayPane) draw() {
 	if pn.im != nil {
 		r := pn.im.Bounds()
-		pn.ftContext.SetClip(r)
-		pn.ftContext.SetDst(pn.im)
+		draw.Draw(pn.im, r, pn.bg, image.ZP, draw.Src)
 
+		pn.ftContext.SetClip(image.Rect(0,0,pn.size.X,pn.size.Y))
+		pn.ftContext.SetDst(pn.ftim)
 		textHeight := int(pn.ftContext.PointToFix32(swtk.FontSize)>>8)
 		pt := freetype.Pt(0, textHeight)
 		pt, _ = pn.ftContext.DrawString(pn.label, pt)
-		lableLength := int(pt.X >> 8)
-		pt = freetype.Pt((r.Dx() - lableLength)  / 2, (r.Dy() + textHeight) / 2 - 1)
-
-		draw.Draw(pn.im, r, pn.bg, image.ZP, draw.Src)
+		labelLength := int(pt.X >> 8)
+		pt = freetype.Pt((pn.size.X - labelLength)  / 2 - pn.view.Min.X, (pn.size.Y + textHeight) / 2 - 1 - pn.view.Min.Y)
+		pn.ftContext.SetDst(pn.im)
 		pn.ftContext.DrawString(pn.label, pt)
 
 		if pn.state > 0 {
-			r0 := image.Rect(r.Min.X, r.Min.Y, r.Max.X, r.Min.Y + pn.highlightWidth)
+			r0 := image.Rect(0, 0, pn.size.X, pn.highlightWidth).Intersect(pn.view).Sub(pn.view.Min)
 			draw.Draw(pn.im, r0, image.Black, image.ZP, draw.Src)
 			//left
-			r0 = image.Rect(r.Min.X, r.Min.Y + pn.highlightWidth, r.Min.X + pn.highlightWidth, r.Max.Y - pn.highlightWidth)
+			r0 = image.Rect(0, pn.highlightWidth, pn.highlightWidth, pn.size.Y - pn.highlightWidth).Intersect(pn.view).Sub(pn.view.Min)
 			draw.Draw(pn.im, r0, image.Black, image.ZP, draw.Src)
 			//bottom
-			r0 = image.Rect(r.Min.X, r.Max.Y - pn.highlightWidth, r.Max.X, r.Max.Y)
+			r0 = image.Rect(0, pn.size.Y - pn.highlightWidth, pn.size.X, pn.size.Y).Intersect(pn.view).Sub(pn.view.Min)
 			draw.Draw(pn.im, r0, image.Black, image.ZP, draw.Src)
 			//right
-			r0 = image.Rect(r.Max.X - pn.highlightWidth, r.Min.Y + pn.highlightWidth, r.Max.X, r.Max.Y - pn.highlightWidth)
+			r0 = image.Rect(pn.size.X - pn.highlightWidth, pn.highlightWidth, pn.size.X, pn.size.Y - pn.highlightWidth).Intersect(pn.view).Sub(pn.view.Min)
 			draw.Draw(pn.im, r0, image.Black, image.ZP, draw.Src)
 		}
 		if pn.state == 2 {

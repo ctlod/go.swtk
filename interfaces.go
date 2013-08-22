@@ -9,7 +9,7 @@ type Pane interface {
 	MinMax() (image.Point, image.Point)
 	SetMinMax(min, max image.Point)
 
-	SetSize(size image.Point)
+	SetSize(size ResizeEvent)
 	Close()
 
 	//Event handling
@@ -37,7 +37,7 @@ type DisplayPane interface {
 	SetRenderer(r Renderer)
 
 	Draw()
-	SetSize(size image.Point)
+	SetSize(size ResizeEvent)
 	Close()
 
 	DrawingHandler()
@@ -50,14 +50,13 @@ type Alignmenter interface {
 // This handles children size and location
 type LayoutPane interface {
 	SetPane(pane Pane)
-	HandleResizeEvent(re image.Point)
+	HandleResizeEvent(re ResizeEvent)
 	HandleCloseEvent()
 	RegisterRenderer(wr Renderer)
 
 	//This initializes pane
 	//no further setup should be possible afterwards
 	AddPane(pane Pane, x, y int)
-	SetAlignment(pane Pane, a Alignmenter)
 }
 
 type Renderer interface {

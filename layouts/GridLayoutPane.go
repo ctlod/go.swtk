@@ -2,7 +2,7 @@ package layouts
 
 import "image"
 import "github.com/ctlod/go.swtk"
-
+import "log"
 
 
 type GridLayoutPane struct {
@@ -32,51 +32,58 @@ func (pn *GridLayoutPane) RegisterRenderer(wr swtk.Renderer) {
 	pn.renderer = wr
 }
 
-func (pn *GridLayoutPane) HandleResizeEvent(re image.Point) {
-	pn.size = re
+func (pn *GridLayoutPane) HandleResizeEvent(re swtk.ResizeEvent) {
+	pn.size = re.Size
 	for _, child := range pn.children {
 		cell := pn.paneCell[child]
-		gc_w := re.X / pn.gridSize.X
-		gc_h := re.Y / pn.gridSize.Y
+		
+		//work out width of current cell
+		gc_w := re.Size.X / pn.gridSize.X
+		gc_h := re.Size.Y / pn.gridSize.Y
 
+		//work out origin of current cell
+		origin := image.Point{gc_w * cell.X, gc_h * cell.Y}
+
+		size := image.Point{gc_w, gc_h}
 		min, max := child.MinMax()
-		c := image.Point{gc_w * cell.X, gc_h * cell.Y}
 
-		p := image.Point{gc_w, gc_h}
-		if min.X > p.X {
-			p.X = 0
-		} else if max.X != 0 && max.X < p.X {
-			p.X = max.X
+		if min.X > size.X {
+			size.X = 0
+		} else if max.X != 0 && max.X < size.X {
+			size.X = max.X
 		}
 
-		if min.Y > p.Y {
-			p.Y = 0
-		} else if max.Y != 0 && max.Y < p.Y {
-			p.Y = max.Y
+		if min.Y > size.Y {
+			size.Y = 0
+		} else if max.Y != 0 && max.Y < size.Y {
+			size.Y = max.Y
 		}
 
 		a := pn.gridAlign[*cell]
-
 		//Align horizontally
-		if (p.X < gc_w) {
+		if (size.X < gc_w) {
 			if (a == swtk.AlignCenter || a== swtk.AlignTop || a == swtk.AlignBottom) {
-				c.X = c.X + (gc_w - p.X) / 2
+				origin.X = origin.X + (gc_w - size.X) / 2
 			} else if (a == swtk.AlignCenterRight || a== swtk.AlignTopRight || a == swtk.AlignBottomRight) {
-				c.X = c.X + (gc_w - p.X)
+				origin.X = origin.X + (gc_w - size.X)
 			}
 		}
 
 		//Align Vertically
-		if (p.Y < gc_h) {
+		if (size.Y < gc_h) {
 			if (a == swtk.AlignCenter || a== swtk.AlignCenterLeft || a == swtk.AlignCenterRight) {
-				c.Y = c.Y + (gc_h - p.Y) / 2
+				origin.Y = origin.Y + (gc_h - size.Y) / 2
 			} else if (a == swtk.AlignBottom || a== swtk.AlignBottomLeft || a == swtk.AlignBottomRight) {
-				c.Y = c.Y + (gc_h - p.Y)
+				origin.Y = origin.Y + (gc_h - size.Y)
 			}
 		}
 
-		pn.renderer.SetLocation(swtk.PaneCoords{child, c, p})
-		child.SetSize(p)
+		//Work out view to tell child
+		p := image.Rect(0, 0, size.X, size.Y).Add(origin)
+		p = p.Intersect(re.View)
+
+		pn.renderer.SetLocation(swtk.PaneCoords{child, p.Min, image.Point{p.Dx(), p.Dy()}})
+		child.SetSize(swtk.ResizeEvent{size, p.Sub(origin)})
 	}
 }
 
@@ -92,6 +99,7 @@ func (lp *GridLayoutPane) SetPane(pn swtk.Pane) {
 
 func (pn *GridLayoutPane) AddPane(pane swtk.Pane, x, y int) {
 	if pn.paneCell[pane] != nil {
+		log.Println("GridLayoutPane - Pane already exists: ", pane, x, y)
 		return
 	}
 
