@@ -70,16 +70,18 @@ func (wr *wdeRenderer) Run() {
 			} else {
 				switch e := e.(type) {
 				case wde.CloseEvent:
-					wr.basePane.Close()
+					if (wr.basePane != nil) {
+						wr.basePane.Close()
+					}
 					wr.wdeWindow.Close()
 					wde.Stop()
 					return
 				case wde.ResizeEvent:
 					x, y := wr.wdeWindow.Size()
-					if (x != 0) && (y != 0) {
+					wr.handleWindowResize()
+					if (x != 0) && (y != 0) && wr.basePane != nil {
 						b := wr.wdeWindow.Screen().Bounds()
 						p := image.Point{b.Dx(), b.Dy()}
-						wr.handleWindowResize()
 						wr.basePane.SetSize(swtk.ResizeEvent{p,b})
 					}
 				case wde.MouseDownEvent:
@@ -148,16 +150,18 @@ func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
 		wr.mousePane = nil
 	} else {
 		targetNode := wr.findNode(int(ms.X), int(ms.Y))
-		if wr.mousePane != targetNode.pane && wr.mousePane != nil {
-			//Pointer Exit Event (ie, -Id, -1, -1 coordinates)
-			wr.mousePane.SetMouseState(swtk.MouseState{int8(-1), int16(-1), int16(-1)})
-			//Pointer Enter Event (Doesn't need to exist...)
-			targetNode.pane.SetMouseState(swtk.MouseState{int8(-1), ms.X - int16(targetNode.x), ms.Y - int16(targetNode.y)})
+		if targetNode != nil {
+			if wr.mousePane != targetNode.pane && wr.mousePane != nil {
+				//Pointer Exit Event (ie, -Id, -1, -1 coordinates)
+				wr.mousePane.SetMouseState(swtk.MouseState{int8(-1), int16(-1), int16(-1)})
+				//Pointer Enter Event (Doesn't need to exist...)
+				targetNode.pane.SetMouseState(swtk.MouseState{int8(-1), ms.X - int16(targetNode.x), ms.Y - int16(targetNode.y)})
+			}
+			//make Pointer Event
+			targetNode.pane.SetMouseState(swtk.MouseState{ms.B, ms.X - int16(targetNode.x), ms.Y - int16(targetNode.y)})
+			//make contact Event
+			wr.mousePane = targetNode.pane
 		}
-		//make Pointer Event
-		targetNode.pane.SetMouseState(swtk.MouseState{ms.B, ms.X - int16(targetNode.x), ms.Y - int16(targetNode.y)})
-		//make contact Event
-		wr.mousePane = targetNode.pane
 	}
 
 	/*
@@ -184,6 +188,9 @@ func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
 }
 
 func (wr *wdeRenderer) findNode(x, y int) *paneNode {
+	if len(wr.renderList) == 0 {
+		return nil
+	}
 	currentNode := wr.renderList[0]
 	nextNode := currentNode
 	for {
