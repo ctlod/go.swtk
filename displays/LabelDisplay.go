@@ -5,13 +5,12 @@ import "image/draw"
 import "image/color"
 import "code.google.com/p/freetype-go/freetype"
 import "github.com/ctlod/go.swtk"
+import "log"
 
-
-type LabelDisplayPane struct {
+type LabelDisplay struct {
 	thePane       swtk.Pane
 	im            draw.Image
 	fg            image.Image
-	renderer  swtk.Renderer
 	drawChannel   chan int
 	sizeChannel   chan swtk.ResizeEvent
 	closeChannel chan int
@@ -23,8 +22,8 @@ type LabelDisplayPane struct {
 	ftim						draw.Image
 }
 
-func NewLabelDisplayPane(l string, c color.Color) *LabelDisplayPane {
-	pn := new(LabelDisplayPane)
+func NewLabelDisplay(pane swtk.Pane, l string, c color.Color) *LabelDisplay {
+	pn := new(LabelDisplay)
 	pn.fg = image.NewUniform(c)
 	pn.sizeChannel = make(chan swtk.ResizeEvent, 1)
 	pn.drawChannel = make(chan int, 1)
@@ -38,24 +37,22 @@ func NewLabelDisplayPane(l string, c color.Color) *LabelDisplayPane {
 	pn.ftContext.SetSrc(pn.fg)
 
 	pn.ftim = image.NewRGBA(image.Rect(0,0,0,0))
+	
+	pn.thePane = pane
 
 	pn.label = l
 	return pn
 }
 
-func (pn *LabelDisplayPane) SetPane(p swtk.Pane) {
-	pn.thePane = p
-}
-
-func (dp *LabelDisplayPane) SetSize(size swtk.ResizeEvent) {
+func (dp *LabelDisplay) SetSize(size swtk.ResizeEvent) {
 	dp.sizeChannel <- size
 }
 
-func (dp *LabelDisplayPane) Close() {
+func (dp *LabelDisplay) Stop() {
 	dp.closeChannel <- 1
 }
 
-func (dp *LabelDisplayPane) setSize(s swtk.ResizeEvent) {
+func (dp *LabelDisplay) setSize(s swtk.ResizeEvent) {
 	//set the correct size in the buffer
 	dp.size = s.Size
 	dp.view = s.View
@@ -65,7 +62,8 @@ func (dp *LabelDisplayPane) setSize(s swtk.ResizeEvent) {
 	dp.im = image.NewRGBA(image.Rect(0, 0, s.View.Dx(), s.View.Dy()))
 }
 
-func (dp *LabelDisplayPane) DrawingHandler() {
+func (dp *LabelDisplay) Display() {
+	log.Println("LabelDisplay Started")
 	for {
 		select {
 		case _ = <-dp.drawChannel:
@@ -79,15 +77,12 @@ func (dp *LabelDisplayPane) DrawingHandler() {
 	}
 }
 
-func (pn *LabelDisplayPane) Draw() {
+func (pn *LabelDisplay) Draw() {
 	pn.drawChannel <- 1
 }
 
-func (dp *LabelDisplayPane) SetRenderer(r swtk.Renderer) {
-	dp.renderer = r
-}
-
-func (pn *LabelDisplayPane) draw() {
+func (pn *LabelDisplay) draw() {
+	log.Println("LabelDisplay Drawing")
 	if pn.im != nil {
 		r := pn.im.Bounds()
 		draw.Draw(pn.im, r, image.Transparent, image.ZP, draw.Src)
@@ -102,5 +97,5 @@ func (pn *LabelDisplayPane) draw() {
 		pn.ftContext.SetDst(pn.im)
 		pn.ftContext.DrawString(pn.label, pt)
 	}
-	pn.renderer.SetAspect(swtk.PaneImage{pn.thePane, pn.im})
+	pn.thePane.Renderer().SetAspect(swtk.PaneImage{pn.thePane, pn.im})
 }

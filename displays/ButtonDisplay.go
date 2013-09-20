@@ -6,11 +6,10 @@ import "image/color"
 import "code.google.com/p/freetype-go/freetype"
 import "github.com/ctlod/go.swtk"
 
-type ButtonDisplayPane struct {
+type ButtonDisplay struct {
 	thePane       	swtk.Pane
 	im            	draw.Image
 	ftim						draw.Image
-	renderer      	swtk.Renderer
 	fg     	     		image.Image
 	bg       				image.Image
 	mask          	image.Image
@@ -27,8 +26,8 @@ type ButtonDisplayPane struct {
 	view						image.Rectangle
 }
 
-func NewButtonDisplayPane(bgc, fgc color.Color, label string) *ButtonDisplayPane {
-	pn := new(ButtonDisplayPane)
+func NewButtonDisplay(pane swtk.Pane, label string, fgc, bgc color.Color) *ButtonDisplay {
+	pn := new(ButtonDisplay)
 	pn.bg = image.NewUniform(bgc)
 	pn.fg = image.NewUniform(fgc)
 	pn.mask = image.NewUniform(color.Alpha{128})
@@ -48,26 +47,24 @@ func NewButtonDisplayPane(bgc, fgc color.Color, label string) *ButtonDisplayPane
 
 	pn.ftim = image.NewRGBA(image.Rect(0,0,0,0))
 
+	pn.thePane = pane
+
 	return pn
 }
 
-func (pn *ButtonDisplayPane) SetPane(p swtk.Pane) {
-	pn.thePane = p
-}
-
-func (dp *ButtonDisplayPane) SetState(s int) {
+func (dp *ButtonDisplay) SetState(s int) {
 	dp.stateChannel <- s
 }
 
-func (dp *ButtonDisplayPane) SetSize(size swtk.ResizeEvent) {
+func (dp *ButtonDisplay) SetSize(size swtk.ResizeEvent) {
 	dp.sizeChannel <- size
 }
 
-func (dp *ButtonDisplayPane) Close() {
+func (dp *ButtonDisplay) Stop() {
 	dp.closeChannel <- 1
 }
 
-func (dp *ButtonDisplayPane) setSize(s swtk.ResizeEvent) {
+func (dp *ButtonDisplay) setSize(s swtk.ResizeEvent) {
 	//set the correct size in the buffer
 	dp.size = s.Size
 	dp.view = s.View
@@ -77,7 +74,7 @@ func (dp *ButtonDisplayPane) setSize(s swtk.ResizeEvent) {
 	dp.im = image.NewRGBA(image.Rect(0, 0, s.View.Dx(), s.View.Dy()))
 }
 
-func (dp *ButtonDisplayPane) DrawingHandler() {
+func (dp *ButtonDisplay) Display() {
 	for {
 		select {
 		case _ = <-dp.drawChannel:
@@ -94,15 +91,11 @@ func (dp *ButtonDisplayPane) DrawingHandler() {
 	}
 }
 
-func (pn *ButtonDisplayPane) Draw() {
+func (pn *ButtonDisplay) Draw() {
 	pn.drawChannel <- 1
 }
 
-func (dp *ButtonDisplayPane) SetRenderer(r swtk.Renderer) {
-	dp.renderer = r
-}
-
-func (pn *ButtonDisplayPane) draw() {
+func (pn *ButtonDisplay) draw() {
 	if pn.im != nil {
 		r := pn.im.Bounds()
 		draw.Draw(pn.im, r, pn.bg, image.ZP, draw.Src)
@@ -135,5 +128,5 @@ func (pn *ButtonDisplayPane) draw() {
 			draw.DrawMask(pn.im, r, image.Black, image.ZP, pn.mask, image.ZP, draw.Over)
 		}
 	}
-	pn.renderer.SetAspect(swtk.PaneImage{pn.thePane, pn.im})
+	pn.thePane.Renderer().SetAspect(swtk.PaneImage{pn.thePane, pn.im})
 }

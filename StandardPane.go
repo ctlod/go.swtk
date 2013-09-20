@@ -2,102 +2,91 @@ package swtk
 
 import "image"
 
-type StandardPane struct {
-	displayPane  DisplayPane
-	layoutPane   LayoutPane
-	inputHandler InputHandler
-
+type standardPane struct {
 	minSize image.Point
 	maxSize image.Point
+	size image.Point
+	
+	id int
 
-	closeChan      chan int
-	resizeChan     chan ResizeEvent
-	mouseStateChan chan MouseState
+	inputChan chan PaneMsger
+
+	visualer    Visualer
+	layouter     Layouter
+	actioner Actioner
+
+	renderer     Renderer
 }
 
-func (pn *StandardPane) MinMax() (image.Point, image.Point) {
+func (pn *standardPane) MinMax() (image.Point, image.Point) {
 	return pn.minSize, pn.maxSize
 }
 
-func (pn *StandardPane) SetMinMax(min, max image.Point) {
-	pn.minSize = min
-	pn.maxSize = max
+func (pn *standardPane) Id() int {
+	return pn.id
 }
 
-func (pn *StandardPane) LayoutPane() LayoutPane {
-	return pn.layoutPane
+func (pn *standardPane) OtherPaneMsg(msg PaneMsger) {
 }
 
-func (pn *StandardPane) SetLayoutPane(lp LayoutPane) {
-	pn.layoutPane = lp
-}
-
-func (pn *StandardPane) InputHandler() InputHandler {
-	return pn.inputHandler
-}
-
-func (pn *StandardPane) SetInputHandler(ih InputHandler) {
-	pn.inputHandler = ih
-}
-
-func (pn *StandardPane) DisplayPane() DisplayPane {
-	return pn.displayPane
-}
-
-func (pn *StandardPane) SetDisplayPane(dp DisplayPane) {
-	pn.displayPane = dp
-}
-
-func (pn *StandardPane) SetSize(size ResizeEvent) {
-	pn.resizeChan <- size
-}
-
-func (pn *StandardPane) Close() {
-	pn.closeChan <- 1
-}
-
-func (pn *StandardPane) SetMouseState(ms MouseState) {
-	pn.mouseStateChan <- ms
-}
-
-func (pn *StandardPane) PaneHandler() {
-	for {
-		select {
-		case me := <-pn.mouseStateChan:
-			if pn.inputHandler != nil {
-				pn.inputHandler.HandleMouseState(me)
-			}
-		case re := <-pn.resizeChan:
-			//only treat last resize in a batch
-			cond := true
-			for cond {
-				select {
-				case re = <-pn.resizeChan:
-				default:
-					cond = false
-				}
-			}
-			if pn.layoutPane != nil {
-				pn.layoutPane.HandleResizeEvent(re)
-			}
-			if pn.displayPane != nil {
-				pn.displayPane.SetSize(re)
-			}
-		case _ = <-pn.closeChan:
-			if pn.layoutPane != nil {
-				pn.layoutPane.HandleCloseEvent()
-			}
-			break
-		}
+func (pn *standardPane) CreatePaneMsgChan() int {
+	if pn.inputChan != nil {
+		return 1
 	}
+	
+	pn.inputChan = make(chan PaneMsger, 0)
+	
+	return 0
 }
 
-func NewStandardPane() *StandardPane {
-	pn := new(StandardPane)
+func (pn *standardPane) PaneMsgChan() chan PaneMsger {
+	return pn.inputChan
+}
+
+func (pn *standardPane) Visualer() Visualer {
+	return pn.visualer
+}
+
+func (pn *standardPane) SetVisualer(vs Visualer) {
+	pn.visualer = vs
+}
+
+func (pn *standardPane) Layouter() Layouter {
+	return pn.layouter
+}
+
+func (pn *standardPane) SetLayouter(ly Layouter) {
+	pn.layouter = ly
+}
+
+func (pn *standardPane) Actioner() Actioner {
+	return pn.actioner
+}
+
+func (pn *standardPane) SetActioner(ac Actioner) {
+	pn.actioner = ac
+}
+
+func (pn *standardPane) Renderer() Renderer {
+	return pn.renderer
+}
+
+func (pn *standardPane) SetRenderer(rn Renderer) {
+	pn.renderer = rn
+}
+
+func (pn *standardPane) SetSize(rs ResizeMsg) {
+	
+}
+
+func (pn *standardPane) Size() image.Point {
+	return pn.size
+}
+
+func NewStandardPane() *standardPane {
+	pn := new(standardPane)
 	pn.minSize = image.Point{0, 0}
 	pn.maxSize = image.Point{0, 0}
-	pn.resizeChan = make(chan ResizeEvent, 8)
-	pn.closeChan = make(chan int)
-	pn.mouseStateChan = make(chan MouseState)
+	pn.id = SwtkId()
 	return pn
 }

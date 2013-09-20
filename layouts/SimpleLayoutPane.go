@@ -71,13 +71,5 @@ func (pn *SimpleLayoutPane) AddPane(pane swtk.Pane, x, y int) {
 	pn.coords[pane] = &image.Point{x, y}
 	pn.renderer.RegisterPane(pane, pn.thePane)
 
-	if pane.LayoutPane() != nil {
-		pane.LayoutPane().RegisterRenderer(pn.renderer)
-	}
-
-	if pane.DisplayPane() != nil {
-		pane.DisplayPane().SetRenderer(pn.renderer)
-	}
-
 	go pane.PaneHandler()
 }

@@ -5,9 +5,8 @@ import "github.com/ctlod/go.swtk"
 import "log"
 
 
-type GridLayoutPane struct {
+type GridLayout struct {
 	thePane  swtk.Pane
-	renderer swtk.Renderer
 	children []swtk.Pane
 	coords   map[swtk.Pane]*image.Point
 	sizes    map[swtk.Pane]*image.Point
@@ -18,21 +17,18 @@ type GridLayoutPane struct {
 	size     image.Point
 }
 
-func NewGridLayoutPane() *GridLayoutPane {
-	pn := new(GridLayoutPane)
+func NewGridLayout(pane swtk.Pane) *GridLayout {
+	pn := new(GridLayout)
 	pn.sizes = make(map[swtk.Pane]*image.Point)
 	pn.paneCell = make(map[swtk.Pane]*image.Point)
 	pn.gridCell = make(map[image.Point]swtk.Pane)
 	pn.gridAlign = make(map[image.Point]swtk.Alignmenter)
 	pn.gridSize = image.Point{0, 0}
+	pn.thePane = pane
 	return pn
 }
 
-func (pn *GridLayoutPane) RegisterRenderer(wr swtk.Renderer) {
-	pn.renderer = wr
-}
-
-func (pn *GridLayoutPane) HandleResizeEvent(re swtk.ResizeEvent) {
+func (pn *GridLayout) HandleResizeEvent(re swtk.ResizeEvent) {
 	pn.size = re.Size
 	for _, child := range pn.children {
 		cell := pn.paneCell[child]
@@ -82,24 +78,20 @@ func (pn *GridLayoutPane) HandleResizeEvent(re swtk.ResizeEvent) {
 		p := image.Rect(0, 0, size.X, size.Y).Add(origin)
 		p = p.Intersect(re.View)
 
-		pn.renderer.SetLocation(swtk.PaneCoords{child, p.Min, image.Point{p.Dx(), p.Dy()}})
+		pn.thePane.Renderer().SetLocation(swtk.PaneCoords{child, p.Min, image.Point{p.Dx(), p.Dy()}})
 		child.SetSize(swtk.ResizeEvent{size, p.Sub(origin)})
 	}
 }
 
-func (pn *GridLayoutPane) HandleCloseEvent() {
+func (pn *GridLayout) HandleCloseEvent() {
 	for _, c := range pn.children {
 		c.Close()
 	}
 }
 
-func (lp *GridLayoutPane) SetPane(pn swtk.Pane) {
-	lp.thePane = pn
-}
-
-func (pn *GridLayoutPane) AddPane(pane swtk.Pane, x, y int) {
+func (pn *GridLayout) AddPane(pane swtk.Pane, x, y int) {
 	if pn.paneCell[pane] != nil {
-		log.Println("GridLayoutPane - Pane already exists: ", pane, x, y)
+		log.Println("GridLayout - Pane already exists: ", pane, x, y)
 		return
 	}
 
@@ -116,20 +108,17 @@ func (pn *GridLayoutPane) AddPane(pane swtk.Pane, x, y int) {
 	pn.paneCell[pane] = &p
 	pn.gridCell[p] = pane
 	pn.gridAlign[p] = swtk.AlignCenter
-	pn.renderer.RegisterPane(pane, pn.thePane)
-
-	if pane.LayoutPane() != nil {
-		pane.LayoutPane().RegisterRenderer(pn.renderer)
-	}
-
-	if pane.DisplayPane() != nil {
-		pane.DisplayPane().SetRenderer(pn.renderer)
-	}
-
-	go pane.PaneHandler()
 }
 
-func (pn *GridLayoutPane) SetAlignment(p swtk.Pane, a swtk.Alignmenter) {
+func (pn *GridLayout) StartPanes () {
+	for _, child := range pn.children {
+		child.SetRenderer(pn.thePane.Renderer())
+		pn.thePane.Renderer().RegisterPane(child, pn.thePane)
+		go child.PaneHandler()
+	}
+}
+
+func (pn *GridLayout) SetAlignment(p swtk.Pane, a swtk.Alignmenter) {
 	c := pn.paneCell[p]
 	pn.gridAlign[*c] = a
 }

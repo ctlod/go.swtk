@@ -3,60 +3,61 @@ package swtk
 import "image"
 
 type Pane interface {
-	//return minimum and maximum sizes desired
-	//0 means not applicable.
-	//minimum may not be respected.
 	MinMax() (image.Point, image.Point)
-	SetMinMax(min, max image.Point)
+	Size() image.Point
+  Id() int
 
-	SetSize(size ResizeEvent)
-	Close()
+	SetSize(rs ResizeMsg)
 
-	//Event handling
-	SetMouseState(ms MouseState)
-	//SetPointerState(ps PointerState)
-	//SetContactState(cs ContactState)
+  PaneMsgChan() chan PaneMsger
+  CreatePaneMsgChan() int
+  OtherPaneMsg(msg PaneMsger)
 
-	//Panes only need to know about focus, the inputHandler will take care of keyboard events
-	//SetFocusState(fs FocusState)
-
-	SetLayoutPane(lp LayoutPane)
-	LayoutPane() LayoutPane
-
-	SetDisplayPane(dp DisplayPane)
-	DisplayPane() DisplayPane
-
-	SetInputHandler(ih InputHandler)
-	InputHandler() InputHandler
-
-	PaneHandler()
+	Visualer() Visualer
+	SetVisualer(vs Visualer)
+	
+	Actioner() Actioner
+	SetActioner(ac Actioner)
+	
+	Layouter() Layouter
+	SetLayouter(ly Layouter)
+	
+  Renderer() Renderer
+  SetRenderer(rd Renderer)
 }
 
-type DisplayPane interface {
-	SetPane(pane Pane)
-	SetRenderer(r Renderer)
+type PaneMsger interface {
+	PaneMsg()
+}
 
+type VisualMsger interface {
+	VisualMsg()
+}
+
+type Visualer interface {
 	Draw()
-	SetSize(size ResizeEvent)
-	Close()
+	ResizeCanvas(re ResizeMsg)
 
-	DrawingHandler()
+	OtherVisualMsg(msg VisualMsger)
+
+	VisualMsgChan() chan VisualMsger
+	CreateVisualMsgChan() int
 }
 
 type Alignmenter interface {
 	Alignment() alignment
 }
 
-// This handles children size and location
-type LayoutPane interface {
-	SetPane(pane Pane)
-	HandleResizeEvent(re ResizeEvent)
-	HandleCloseEvent()
-	RegisterRenderer(wr Renderer)
+type Actioner interface {
+	HandleMouseState(ms MouseState)
+}
 
-	//This initializes pane
-	//no further setup should be possible afterwards
+type Layouter interface {
+	MapClose()
+	MapResize(re ResizeMsg)
+
 	AddPane(pane Pane, x, y int)
+	RemovePane(pane Pane)
 }
 
 type Renderer interface {
@@ -66,15 +67,106 @@ type Renderer interface {
 	SetBasePane(pane Pane)
 	Run()
 	BackEndRun()
-
-	//RequestFocus(pn Pane)
 }
 
-type InputHandler interface {
-	SetPane(pn Pane)
-	HandleMouseState(ms MouseState)
-	//	HandlePointerState(ps PointerState)
-	//	HandleContactState(cs ContactState)
-	InputHandler()
+func VisualerActor(vs Visualer) {
+	ok := vs.CreateVisualMsgChan()
+	if ok != 0 {
+		return
+	}
+	for {
+		select {
+		case msg, inChanOk := <- vs.VisualMsgChan():
+			if !inChanOk {
+				break
+			}
+			switch msg := msg.(type) {
+			case ResizeMsg:
+				vs.ResizeCanvas(msg)
+				vs.Draw()
+			default:
+				vs.OtherVisualMsg(msg)
+			}
+		}
+	}
 }
 
+func PaneHandler(pn Pane) {
+	ok := pn.CreatePaneMsgChan()
+	if ok != 0 {
+		return
+	}
+	for {
+		select {
+		case msg, inChanOk := <- pn.PaneMsgChan():
+			if !inChanOk {
+			  if pn.Layouter() != nil {
+			  	pn.Layouter().MapClose()
+			  }
+			  if pn.Visualer() != nil {
+			  	close(pn.Visualer().VisualMsgChan())
+			  }
+			  if pn.Actioner() != nil {
+			  }
+				return
+			}
+			switch msg := msg.(type) {
+			case ResizeMsg:
+				pn.SetSize(msg)
+				if pn.Layouter() != nil {
+					pn.Layouter().MapResize(msg)
+				}
+				if pn.Visualer() != nil {
+					pn.Visualer().VisualMsgChan() <- msg
+				}
+			case SetRendererMsg:
+				if(pn.Renderer() != nil){
+					if (pn.Renderer() != msg.Renderer) {
+						//changing ?
+					} else {
+						//adding same again ?
+					}
+				} else {
+					pn.SetRenderer(msg.Renderer)
+				}
+			case SetLayouterMsg:
+				if(pn.Layouter() != nil){
+					if (pn.Layouter() != msg.Layouter) {
+						//changing ?
+					} else {
+						//adding same again ?
+					}
+				} else {
+					pn.SetLayouter(msg.Layouter)
+				}
+			case SetActionerMsg:
+				if(pn.Actioner() != nil){
+					if (pn.Actioner() != msg.Actioner) {
+						//changing ?
+					} else {
+						//adding same again ?
+					}
+				} else {
+					pn.SetActioner(msg.Actioner)
+				}
+			case SetVisualerMsg:
+				if(pn.Visualer() != nil){
+					if (pn.Visualer() != msg.Visualer) {
+						//changing ?
+					} else {
+						//adding same again ?
+					}
+				} else {
+					pn.SetVisualer(msg.Visualer)
+				}
+			default:
+				pn.OtherPaneMsg(msg)
+			}
+		}
+	}
+}
+
+func SwtkId() int {
+	i := <- idChan
+	return i
+}

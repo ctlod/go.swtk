@@ -14,6 +14,7 @@ var (
 	FontSize    float64
 	LineSpacing float64
 	Font        *truetype.Font
+	idChan chan int
 )
 
 func init() {
@@ -21,6 +22,9 @@ func init() {
 	flag.StringVar(&Fontfile, "fontfile", "arial.ttf", "filename of the ttf font")
 	flag.Float64Var(&FontSize, "size", 12, "font size in points")
 	flag.Float64Var(&LineSpacing, "spacing", 1.5, "line spacing (e.g. 2 means double spaced)")
+
+	idChan = make(chan int, 0)
+	go fillIdChan()
 
 	// Read the font data.
 	fontBytes, err := ioutil.ReadFile(Fontfile)
@@ -36,6 +40,14 @@ func init() {
 	Font = font1
 }
 
+func fillIdChan() {
+	i := 1
+	for {
+		idChan <- i
+		i++
+	}
+}
+
 type PaneCoords struct {
 	Pane   Pane
 	Coords image.Point
@@ -47,10 +59,6 @@ type PaneImage struct {
 	Image draw.Image
 }
 
-type ResizeEvent struct {
-	Size image.Point
-	View image.Rectangle
-}
 
 type alignment int
 
@@ -86,6 +94,7 @@ type PointerState struct {
 //This is where on screen has been 'touched'
 // ie: with finger, or mouse button down
 //There will certainly be multiple contacts from multiple Devices
+//How to handle drags ?
 type ContactState struct {
 	Device int
 	Id     int
