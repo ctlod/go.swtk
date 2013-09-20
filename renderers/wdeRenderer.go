@@ -18,18 +18,18 @@ type paneNode struct {
 }
 
 type wdeRenderer struct {
-	basePane    swtk.Pane
-	wdeWindow   wde.Window
-	renderList  []*paneNode
-	paneMap     map[int]*paneNode
-	panesCom    chan swtk.PaneImage
-	panesCoords chan swtk.PaneCoords
-	minSize     image.Point
-	maxSize     image.Point
-	bgImage     image.Image
-	mouseState  swtk.MouseState
-	mouseActioner   swtk.Actioner
-	pointerPanes map[image.Point]swtk.Pane
+	basePane      swtk.Pane
+	wdeWindow     wde.Window
+	renderList    []*paneNode
+	paneMap       map[int]*paneNode
+	panesCom      chan swtk.PaneImage
+	panesCoords   chan swtk.PaneCoords
+	minSize       image.Point
+	maxSize       image.Point
+	bgImage       image.Image
+	mouseState    swtk.MouseState
+	mouseActioner swtk.Actioner
+	pointerPanes  map[image.Point]swtk.Pane
 }
 
 func NewWdeRenderer(title string, bg color.Color) *wdeRenderer {
@@ -70,7 +70,7 @@ func (wr *wdeRenderer) Run() {
 			} else {
 				switch e := e.(type) {
 				case wde.CloseEvent:
-					if (wr.basePane != nil) {
+					if wr.basePane != nil {
 						close(wr.basePane.PaneMsgChan())
 					}
 					wr.wdeWindow.Close()
@@ -84,7 +84,7 @@ func (wr *wdeRenderer) Run() {
 							p := image.Point{x, y}
 							wr.refreshLocation(wr.basePane, image.ZP, p)
 							b := image.Rectangle{image.ZP, p}
-							wr.basePane.SetSize(swtk.ResizeMsg{Size: p, View: b})
+							wr.basePane.PaneMsgChan() <- swtk.ResizeMsg{Size: p, View: b}
 						}
 					}
 				case wde.MouseDownEvent:
@@ -117,7 +117,8 @@ func (wr *wdeRenderer) Run() {
 			p := wr.paneMap[pn.Pane.Id()]
 			r := pn.Image.Bounds().Add(image.Point{p.x, p.y})
 			rr := r
-			panesCom:for {
+		panesCom:
+			for {
 				select {
 				case pn = <-wr.panesCom:
 					wr.refreshBuffer(pn.Pane, pn.Image)
@@ -131,7 +132,8 @@ func (wr *wdeRenderer) Run() {
 			wr.render(rr)
 		case pc := <-wr.panesCoords:
 			wr.refreshLocation(pc.Pane, pc.Coords, pc.Size)
-			panesCoords:for {
+		panesCoords:
+			for {
 				select {
 				case pc = <-wr.panesCoords:
 					wr.refreshLocation(pc.Pane, pc.Coords, pc.Size)
@@ -153,7 +155,7 @@ func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
 		wr.mouseActioner = nil
 	} else {
 		targetNode := wr.findNode(int(ms.X), int(ms.Y))
-		if targetNode != nil && targetNode.pane.Actioner() != nil{
+		if targetNode != nil && targetNode.pane.Actioner() != nil {
 			newActioner := targetNode.pane.Actioner()
 			if wr.mouseActioner != nil && wr.mouseActioner != newActioner {
 				//Pointer Exit Event (ie, -Id, -1, -1 coordinates)
@@ -169,24 +171,24 @@ func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
 	}
 
 	/*
-	//handle pointer event from Mouse
-	if ms.X < int16(0) {
-		//create exit pointer
-		if wr.pointerPanes[image.Point{0,0}] != nil {
-			p := swtk.PointerState{0,0, -1, -1}
-			log.Println(p)
-			wr.pointerPanes[image.Point{0,0}] = nil
+		//handle pointer event from Mouse
+		if ms.X < int16(0) {
+			//create exit pointer
+			if wr.pointerPanes[image.Point{0,0}] != nil {
+				p := swtk.PointerState{0,0, -1, -1}
+				log.Println(p)
+				wr.pointerPanes[image.Point{0,0}] = nil
+			}
+		} else {
+			targetNode := wr.findNode(int(ms.X), int(ms.Y))
+			if wr.pointerPanes[image.Point{0,0}] != targetNode.pane && wr.pointerPanes[image.Point{0,0}] != nil {
+				po := swtk.PointerState{0,0, -1, -1}
+				log.Println(po)
+			}
+			pi := swtk.PointerState{0,0, int(ms.X) - targetNode.x, int(ms.Y) - targetNode.y}
+			log.Println(pi)
+			wr.pointerPanes[image.ZP] = targetNode.pane
 		}
-	} else {
-		targetNode := wr.findNode(int(ms.X), int(ms.Y))
-		if wr.pointerPanes[image.Point{0,0}] != targetNode.pane && wr.pointerPanes[image.Point{0,0}] != nil {
-			po := swtk.PointerState{0,0, -1, -1}
-			log.Println(po)
-		}
-		pi := swtk.PointerState{0,0, int(ms.X) - targetNode.x, int(ms.Y) - targetNode.y}
-		log.Println(pi)
-		wr.pointerPanes[image.ZP] = targetNode.pane
-	}
 	*/
 	wr.mouseState = ms
 }
@@ -202,7 +204,7 @@ func (wr *wdeRenderer) findNode(x, y int) *paneNode {
 		if nbChildren >= 0 {
 			for nbChildren >= 0 {
 				child := currentNode.children[nbChildren]
-				if x-child.x >= 0 && x - child.x < child.dx && y - child.y >= 0 && y - child.y < child.dy {
+				if x-child.x >= 0 && x-child.x < child.dx && y-child.y >= 0 && y-child.y < child.dy {
 					nextNode = currentNode.children[nbChildren]
 					nbChildren = -1
 				} else {
@@ -242,17 +244,18 @@ func (wr *wdeRenderer) SetBasePane(pane swtk.Pane) {
 		log.Println("wdeRenderer.go - SetBasePane: Already Set!")
 	}
 	wr.basePane = pane
-	log.Println(wr.basePane)
+	pane.PaneMsgChan() <- swtk.SetRendererMsg{Renderer: wr}
+	log.Println("BasePane: ", wr.basePane.Id())
 	wr.paneMap[pane.Id()] = new(paneNode)
 	wr.paneMap[pane.Id()].pane = pane
 	wr.renderList = buildRenderList(wr.paneMap[wr.basePane.Id()], nil)
-	log.Println(wr.renderList, wr.renderList[0].pane)
+	log.Println(wr.renderList, wr.renderList[0].pane.Id())
 }
 
 func (wr *wdeRenderer) refreshLocation(pane swtk.Pane, point image.Point, sizes image.Point) {
-	log.Println("wdeRendere refreshlocation", pane, point, sizes)
+	log.Println("wdeRendere refreshlocation", pane.Id(), point, sizes)
 	node := wr.paneMap[pane.Id()]
-	if (node.parent != nil) {
+	if node.parent != nil {
 		node.x = node.parent.x + point.X
 		node.y = node.parent.y + point.Y
 	}
@@ -267,7 +270,7 @@ func (wr *wdeRenderer) refreshBuffer(pane swtk.Pane, im draw.Image) {
 }
 
 func (wr *wdeRenderer) SetAspect(im swtk.PaneImage) {
-	wr.panesCom <-im
+	wr.panesCom <- im
 }
 
 func (wr *wdeRenderer) SetLocation(pc swtk.PaneCoords) {
@@ -278,9 +281,9 @@ func (wr *wdeRenderer) render(section image.Rectangle) {
 	log.Println("wdeRenderer render", section)
 	draw.Draw(wr.wdeWindow.Screen(), section, wr.bgImage, image.ZP.Sub(section.Min), draw.Src)
 	for _, src := range wr.renderList {
-		log.Println("wdeRenderer render src", src)			
+		log.Println("wdeRenderer render src", src)
 		if src.im != nil && src.dx > 0 && src.dy > 0 {
-			log.Println("wdeRenderer render src drawing")			
+			log.Println("wdeRenderer render src drawing")
 			orig := section.Min.Sub(image.Point{src.x, src.y})
 			draw.Draw(wr.wdeWindow.Screen(), section, src.im, orig, draw.Over)
 		}

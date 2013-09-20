@@ -14,7 +14,7 @@ var (
 	FontSize    float64
 	LineSpacing float64
 	Font        *truetype.Font
-	idChan chan int
+	idChan      chan int
 )
 
 func init() {
@@ -58,7 +58,6 @@ type PaneImage struct {
 	Pane  Pane
 	Image draw.Image
 }
-
 
 type alignment int
 

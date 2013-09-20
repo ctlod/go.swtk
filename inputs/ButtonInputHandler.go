@@ -4,10 +4,10 @@ import "github.com/ctlod/go.swtk"
 import "github.com/ctlod/go.swtk/displays"
 
 type ButtonInputHandler struct {
-	thePane    swtk.Pane
-	ms         swtk.MouseState
-	closeChannel chan int
-	mouseStateChannel chan swtk.MouseState
+	thePane             swtk.Pane
+	ms                  swtk.MouseState
+	closeChannel        chan int
+	mouseStateChannel   chan swtk.MouseState
 	pointerStateChannel chan swtk.PointerState
 }
 
@@ -27,12 +27,12 @@ func (ih *ButtonInputHandler) SetPane(pane swtk.Pane) {
 func (ih *ButtonInputHandler) InputHandler() {
 	for {
 		select {
-			case _ = <- ih.closeChannel:
-				break
-			case mse := <- ih.mouseStateChannel:
-				ih.handleMouseState(mse)
-			case mse := <- ih.pointerStateChannel:
-				ih.handlePointerState(mse)
+		case _ = <-ih.closeChannel:
+			break
+		case mse := <-ih.mouseStateChannel:
+			ih.handleMouseState(mse)
+		case mse := <-ih.pointerStateChannel:
+			ih.handlePointerState(mse)
 		}
 	}
 }
@@ -70,7 +70,6 @@ func (ih *ButtonInputHandler) handleContanctState(mse swtk.ContactState) {
 		}
 	}
 }
-
 
 func (ih *ButtonInputHandler) handleMouseState(mse swtk.MouseState) {
 	if ih.thePane.DisplayPane() != nil {

@@ -1,5 +1,6 @@
 package displays
 
+/*
 import "image"
 import "image/draw"
 import "image/color"
@@ -38,7 +39,7 @@ func NewButtonDisplay(pane swtk.Pane, label string, fgc, bgc color.Color) *Butto
 	pn.stateChannel = make(chan int, 1)
 	pn.state = 0
 	pn.label = label
-	
+
 	pn.ftContext = freetype.NewContext()
 	pn.ftContext.SetDPI(swtk.Dpi)
 	pn.ftContext.SetFont(swtk.Font)
@@ -130,3 +131,4 @@ func (pn *ButtonDisplay) draw() {
 	}
 	pn.thePane.Renderer().SetAspect(swtk.PaneImage{pn.thePane, pn.im})
 }
+*/

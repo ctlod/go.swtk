@@ -41,3 +41,7 @@ type SetRendererMsg struct {
 	PaneMessage
 }
 
+type SetPaneMsg struct {
+	Pane Pane
+	VisualMessage
+}

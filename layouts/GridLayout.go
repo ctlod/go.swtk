@@ -4,23 +4,22 @@ import "image"
 import "github.com/ctlod/go.swtk"
 import "log"
 
-
 type GridLayout struct {
-	thePane  swtk.Pane
-	children []swtk.Pane
-	coords   map[swtk.Pane]*image.Point
-	sizes    map[swtk.Pane]*image.Point
-	paneCell map[swtk.Pane]*image.Point
-	gridCell map[image.Point]swtk.Pane
+	thePane   swtk.Pane
+	children  []swtk.Pane
+	coords    map[int]*image.Point
+	sizes     map[int]*image.Point
+	paneCell  map[int]*image.Point
+	gridCell  map[image.Point]swtk.Pane
 	gridAlign map[image.Point]swtk.Alignmenter
-	gridSize image.Point
-	size     image.Point
+	gridSize  image.Point
+	size      image.Point
 }
 
 func NewGridLayout(pane swtk.Pane) *GridLayout {
 	pn := new(GridLayout)
-	pn.sizes = make(map[swtk.Pane]*image.Point)
-	pn.paneCell = make(map[swtk.Pane]*image.Point)
+	pn.sizes = make(map[int]*image.Point)
+	pn.paneCell = make(map[int]*image.Point)
 	pn.gridCell = make(map[image.Point]swtk.Pane)
 	pn.gridAlign = make(map[image.Point]swtk.Alignmenter)
 	pn.gridSize = image.Point{0, 0}
@@ -32,7 +31,7 @@ func (pn *GridLayout) HandleResizeEvent(re swtk.ResizeEvent) {
 	pn.size = re.Size
 	for _, child := range pn.children {
 		cell := pn.paneCell[child]
-		
+
 		//work out width of current cell
 		gc_w := re.Size.X / pn.gridSize.X
 		gc_h := re.Size.Y / pn.gridSize.Y
@@ -57,19 +56,19 @@ func (pn *GridLayout) HandleResizeEvent(re swtk.ResizeEvent) {
 
 		a := pn.gridAlign[*cell]
 		//Align horizontally
-		if (size.X < gc_w) {
-			if (a == swtk.AlignCenter || a== swtk.AlignTop || a == swtk.AlignBottom) {
-				origin.X = origin.X + (gc_w - size.X) / 2
-			} else if (a == swtk.AlignCenterRight || a== swtk.AlignTopRight || a == swtk.AlignBottomRight) {
+		if size.X < gc_w {
+			if a == swtk.AlignCenter || a == swtk.AlignTop || a == swtk.AlignBottom {
+				origin.X = origin.X + (gc_w-size.X)/2
+			} else if a == swtk.AlignCenterRight || a == swtk.AlignTopRight || a == swtk.AlignBottomRight {
 				origin.X = origin.X + (gc_w - size.X)
 			}
 		}
 
 		//Align Vertically
-		if (size.Y < gc_h) {
-			if (a == swtk.AlignCenter || a== swtk.AlignCenterLeft || a == swtk.AlignCenterRight) {
-				origin.Y = origin.Y + (gc_h - size.Y) / 2
-			} else if (a == swtk.AlignBottom || a== swtk.AlignBottomLeft || a == swtk.AlignBottomRight) {
+		if size.Y < gc_h {
+			if a == swtk.AlignCenter || a == swtk.AlignCenterLeft || a == swtk.AlignCenterRight {
+				origin.Y = origin.Y + (gc_h-size.Y)/2
+			} else if a == swtk.AlignBottom || a == swtk.AlignBottomLeft || a == swtk.AlignBottomRight {
 				origin.Y = origin.Y + (gc_h - size.Y)
 			}
 		}
@@ -95,11 +94,11 @@ func (pn *GridLayout) AddPane(pane swtk.Pane, x, y int) {
 		return
 	}
 
-	if (pn.gridSize.X <= x) {
+	if pn.gridSize.X <= x {
 		pn.gridSize.X = x + 1
 	}
 
-	if (pn.gridSize.Y <= y) {
+	if pn.gridSize.Y <= y {
 		pn.gridSize.Y = y + 1
 	}
 
@@ -110,7 +109,7 @@ func (pn *GridLayout) AddPane(pane swtk.Pane, x, y int) {
 	pn.gridAlign[p] = swtk.AlignCenter
 }
 
-func (pn *GridLayout) StartPanes () {
+func (pn *GridLayout) StartPanes() {
 	for _, child := range pn.children {
 		child.SetRenderer(pn.thePane.Renderer())
 		pn.thePane.Renderer().RegisterPane(child, pn.thePane)

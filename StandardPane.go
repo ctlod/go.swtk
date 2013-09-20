@@ -5,17 +5,17 @@ import "image"
 type standardPane struct {
 	minSize image.Point
 	maxSize image.Point
-	size image.Point
-	
+	size    image.Point
+
 	id int
 
 	inputChan chan PaneMsger
 
-	visualer    Visualer
-	layouter     Layouter
+	visualer Visualer
+	layouter Layouter
 	actioner Actioner
 
-	renderer     Renderer
+	renderer Renderer
 }
 
 func (pn *standardPane) MinMax() (image.Point, image.Point) {
@@ -33,9 +33,9 @@ func (pn *standardPane) CreatePaneMsgChan() int {
 	if pn.inputChan != nil {
 		return 1
 	}
-	
+
 	pn.inputChan = make(chan PaneMsger, 0)
-	
+
 	return 0
 }
 
@@ -76,7 +76,7 @@ func (pn *standardPane) SetRenderer(rn Renderer) {
 }
 
 func (pn *standardPane) SetSize(rs ResizeMsg) {
-	
+
 }
 
 func (pn *standardPane) Size() image.Point {
@@ -88,5 +88,7 @@ func NewStandardPane() *standardPane {
 	pn.minSize = image.Point{0, 0}
 	pn.maxSize = image.Point{0, 0}
 	pn.id = SwtkId()
+	pn.inputChan = make(chan PaneMsger)
+	go PaneActor(pn)
 	return pn
 }
