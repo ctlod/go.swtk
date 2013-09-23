@@ -42,9 +42,8 @@ type Visualer interface {
 	Draw()
 	ResizeCanvas(re ResizeMsg)
 
-	OtherVisualMsg(msg VisualMsger)
-
 	VisualMsgChan() chan VisualMsger
+	OtherVisualMsg(msg VisualMsger)
 
 	Pane() Pane
 	SetPane(p Pane)
@@ -135,8 +134,6 @@ func PaneActor(pn Pane) {
 				if pn.Visualer() != nil {
 					close(pn.Visualer().VisualMsgChan())
 				}
-				if pn.Actioner() != nil {
-				}
 				return
 			}
 			log.Println("Received Msg for Pane ", pn.Id())
@@ -151,40 +148,16 @@ func PaneActor(pn Pane) {
 					pn.Visualer().VisualMsgChan() <- msg
 				}
 			case SetRendererMsg:
-				if pn.Renderer() != nil {
-					if pn.Renderer() != msg.Renderer {
-						//changing ?
-					}
-				} else {
+				if pn.Renderer() == nil {
 					pn.SetRenderer(msg.Renderer)
 				}
 			case SetLayouterMsg:
-				if pn.Layouter() != nil {
-					if pn.Layouter() != msg.Layouter {
-						//changing ?
-					} else {
-						//adding same again ?
-					}
-				} else {
+				if pn.Layouter() == nil {
 					pn.SetLayouter(msg.Layouter)
-					msg.Layouter.SetPane(pn)
-				}
-			case SetActionerMsg:
-				if pn.Actioner() != nil {
-					if pn.Actioner() != msg.Actioner {
-						//changing ?
-					} else {
-						//adding same again ?
-					}
-				} else {
-					pn.SetActioner(msg.Actioner)
+					msg.Layouter.LayoutMsgChan() <- SetPaneMsg{Pane: pn}
 				}
 			case SetVisualerMsg:
-				if pn.Visualer() != nil {
-					if pn.Visualer() != msg.Visualer {
-						//changing ?
-					}
-				} else {
+				if pn.Visualer() == nil {
 					log.Println("Adding visual to ", pn.Id())
 					pn.SetVisualer(msg.Visualer)
 					msg.Visualer.VisualMsgChan() <- SetPaneMsg{Pane: pn}
