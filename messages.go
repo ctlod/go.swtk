@@ -28,6 +28,14 @@ type ResizeMsg struct {
 	LayoutMessage
 }
 
+type AddPaneMsg struct {
+	Pane Pane
+	X, Y int
+}
+
+func (msg AddPaneMsg) LayoutMsg() {
+}
+
 type SetLayouterMsg struct {
 	Layouter Layouter
 	PaneMessage

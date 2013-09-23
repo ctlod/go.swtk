@@ -104,7 +104,7 @@ func VisualActor(vs Visualer) {
 func LayoutActor(ly Layouter) {
 	for {
 		select {
-		case msg, inChanOk := <- ly.LayoutMsgChan():
+		case msg, inChanOk := <-ly.LayoutMsgChan():
 			if !inChanOk {
 				ly.MapClose()
 				return
@@ -115,6 +115,8 @@ func LayoutActor(ly Layouter) {
 				ly.MapResize(msg)
 			case SetPaneMsg:
 				ly.SetPane(msg.Pane)
+			case AddPaneMsg:
+				ly.AddPane(msg.Pane, msg.X, msg.Y)
 			default:
 				ly.OtherLayoutMsg(msg)
 			}
