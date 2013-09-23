@@ -11,7 +11,6 @@ type Pane interface {
 	SetSize(rs ResizeMsg)
 
 	PaneMsgChan() chan PaneMsger
-	CreatePaneMsgChan() int
 	OtherPaneMsg(msg PaneMsger)
 
 	Visualer() Visualer
@@ -35,6 +34,10 @@ type VisualMsger interface {
 	VisualMsg()
 }
 
+type LayoutMsger interface {
+	LayoutMsg()
+}
+
 type Visualer interface {
 	Draw()
 	ResizeCanvas(re ResizeMsg)
@@ -42,7 +45,6 @@ type Visualer interface {
 	OtherVisualMsg(msg VisualMsger)
 
 	VisualMsgChan() chan VisualMsger
-	CreateVisualMsgChan() int
 
 	Pane() Pane
 	SetPane(p Pane)
@@ -59,6 +61,12 @@ type Actioner interface {
 type Layouter interface {
 	MapClose()
 	MapResize(re ResizeMsg)
+
+	LayoutMsgChan() chan LayoutMsger
+	OtherLayoutMsg(msg LayoutMsger)
+
+	Pane() Pane
+	SetPane(pane Pane)
 
 	AddPane(pane Pane, x, y int)
 	RemovePane(pane Pane)
@@ -94,6 +102,27 @@ func VisualActor(vs Visualer) {
 	}
 }
 
+func LayoutActor(ly Layouter) {
+	for {
+		select {
+		case msg, inChanOk := <- ly.LayoutMsgChan():
+			if !inChanOk {
+				ly.MapClose()
+				return
+			}
+			switch msg := msg.(type) {
+			case ResizeMsg:
+				log.Println("Layouting ", ly.Pane().Id())
+				ly.MapResize(msg)
+			case SetPaneMsg:
+				ly.SetPane(msg.Pane)
+			default:
+				ly.OtherLayoutMsg(msg)
+			}
+		}
+	}
+}
+
 func PaneActor(pn Pane) {
 	log.Println("Starting ", pn.Id())
 	for {
@@ -101,7 +130,7 @@ func PaneActor(pn Pane) {
 		case msg, inChanOk := <-pn.PaneMsgChan():
 			if !inChanOk {
 				if pn.Layouter() != nil {
-					pn.Layouter().MapClose()
+					close(pn.Layouter().LayoutMsgChan())
 				}
 				if pn.Visualer() != nil {
 					close(pn.Visualer().VisualMsgChan())
@@ -116,7 +145,7 @@ func PaneActor(pn Pane) {
 				log.Println("Resize ", pn.Id())
 				pn.SetSize(msg)
 				if pn.Layouter() != nil {
-					pn.Layouter().MapResize(msg)
+					pn.Layouter().LayoutMsgChan() <- msg
 				}
 				if pn.Visualer() != nil {
 					pn.Visualer().VisualMsgChan() <- msg
@@ -138,6 +167,7 @@ func PaneActor(pn Pane) {
 					}
 				} else {
 					pn.SetLayouter(msg.Layouter)
+					msg.Layouter.SetPane(pn)
 				}
 			case SetActionerMsg:
 				if pn.Actioner() != nil {

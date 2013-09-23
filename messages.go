@@ -14,11 +14,18 @@ type VisualMessage struct {
 func (vs VisualMessage) VisualMsg() {
 }
 
+type LayoutMessage struct {
+}
+
+func (ly LayoutMessage) LayoutMsg() {
+}
+
 type ResizeMsg struct {
-	PaneMessage
 	Size image.Point
 	View image.Rectangle
+	PaneMessage
 	VisualMessage
+	LayoutMessage
 }
 
 type SetLayouterMsg struct {
@@ -44,4 +51,5 @@ type SetRendererMsg struct {
 type SetPaneMsg struct {
 	Pane Pane
 	VisualMessage
+	LayoutMessage
 }

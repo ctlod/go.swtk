@@ -14,23 +14,42 @@ type GridLayout struct {
 	gridAlign map[image.Point]swtk.Alignmenter
 	gridSize  image.Point
 	size      image.Point
+	iChan	chan swtk.LayoutMsger
 }
 
-func NewGridLayout(pane swtk.Pane) *GridLayout {
+func NewGridLayout() *GridLayout {
 	pn := new(GridLayout)
 	pn.sizes = make(map[int]*image.Point)
 	pn.paneCell = make(map[int]*image.Point)
 	pn.gridCell = make(map[image.Point]swtk.Pane)
 	pn.gridAlign = make(map[image.Point]swtk.Alignmenter)
 	pn.gridSize = image.Point{0, 0}
-	pn.thePane = pane
+	pn.iChan = make(chan swtk.LayoutMsger)
+	go swtk.LayoutActor(pn)
 	return pn
 }
 
-func (pn *GridLayout) HandleResizeEvent(re swtk.ResizeEvent) {
+func (gl *GridLayout) LayoutMsgChan() chan swtk.LayoutMsger {
+	return gl.iChan
+}
+
+func (gl *GridLayout) OtherLayoutMsg(msg swtk.LayoutMsger) {
+}
+
+func (gl *GridLayout) Pane() swtk.Pane {
+	return gl.thePane
+}
+
+func (gl *GridLayout) SetPane(pane swtk.Pane) {
+	gl.thePane = pane
+}
+
+func (pn *GridLayout) MapResize(re swtk.ResizeMsg) {
+	log.Println("Mapping Resize for Pane ", pn.thePane.Id())
 	pn.size = re.Size
 	for _, child := range pn.children {
-		cell := pn.paneCell[child]
+		log.Println("Mapping Resize to Pane ", child.Id())
+		cell := pn.paneCell[child.Id()]
 
 		//work out width of current cell
 		gc_w := re.Size.X / pn.gridSize.X
@@ -78,46 +97,44 @@ func (pn *GridLayout) HandleResizeEvent(re swtk.ResizeEvent) {
 		p = p.Intersect(re.View)
 
 		pn.thePane.Renderer().SetLocation(swtk.PaneCoords{child, p.Min, image.Point{p.Dx(), p.Dy()}})
-		child.SetSize(swtk.ResizeEvent{size, p.Sub(origin)})
+		child.PaneMsgChan() <- swtk.ResizeMsg{Size: size, View: p.Sub(origin)}
 	}
 }
 
-func (pn *GridLayout) HandleCloseEvent() {
+func (gl *GridLayout) RemovePane(pn swtk.Pane) {
+}
+
+func (pn *GridLayout) MapClose() {
 	for _, c := range pn.children {
-		c.Close()
+		close(c.PaneMsgChan())
 	}
 }
 
-func (pn *GridLayout) AddPane(pane swtk.Pane, x, y int) {
-	if pn.paneCell[pane] != nil {
-		log.Println("GridLayout - Pane already exists: ", pane, x, y)
+func (gl *GridLayout) AddPane(pane swtk.Pane, x, y int) {
+	if gl.paneCell[pane.Id()] != nil {
+		log.Println("GridLayout - Pane already exists: ", pane.Id(), x, y)
 		return
 	}
 
-	if pn.gridSize.X <= x {
-		pn.gridSize.X = x + 1
+	if gl.gridSize.X <= x {
+		gl.gridSize.X = x + 1
 	}
 
-	if pn.gridSize.Y <= y {
-		pn.gridSize.Y = y + 1
+	if gl.gridSize.Y <= y {
+		gl.gridSize.Y = y + 1
 	}
 
-	pn.children = append(pn.children, pane)
+	gl.children = append(gl.children, pane)
 	p := image.Point{x, y}
-	pn.paneCell[pane] = &p
-	pn.gridCell[p] = pane
-	pn.gridAlign[p] = swtk.AlignCenter
+	gl.paneCell[pane.Id()] = &p
+	gl.gridCell[p] = pane
+	gl.gridAlign[p] = swtk.AlignCenter
+	gl.thePane.Renderer().RegisterPane(pane, gl.thePane)
+	pane.PaneMsgChan() <- swtk.SetRendererMsg{Renderer: gl.thePane.Renderer()}
+	
 }
 
-func (pn *GridLayout) StartPanes() {
-	for _, child := range pn.children {
-		child.SetRenderer(pn.thePane.Renderer())
-		pn.thePane.Renderer().RegisterPane(child, pn.thePane)
-		go child.PaneHandler()
-	}
-}
-
-func (pn *GridLayout) SetAlignment(p swtk.Pane, a swtk.Alignmenter) {
-	c := pn.paneCell[p]
+func (pn *GridLayout) SetAlignment(pane swtk.Pane, a swtk.Alignmenter) {
+	c := pn.paneCell[pane.Id()]
 	pn.gridAlign[*c] = a
 }
