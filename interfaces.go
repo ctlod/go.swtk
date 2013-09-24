@@ -75,8 +75,10 @@ type Renderer interface {
 	RegisterPane(pane Pane, parentPane Pane)
 	SetAspect(pi PaneImage)
 	SetLocation(pc PaneCoords)
-	SetBasePane(pane Pane)
 	Run()
+}
+
+type NewRenderer interface {
 	BackEndRun()
 }
 

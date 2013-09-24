@@ -89,6 +89,11 @@ func NewStandardPane() *standardPane {
 	pn.maxSize = image.Point{0, 0}
 	pn.id = SwtkId()
 	pn.inputChan = make(chan PaneMsger)
+	return pn
+}
+
+func NewStandardPaneActor() *standardPane {
+	pn := NewStandardPane()
 	go PaneActor(pn)
 	return pn
 }

@@ -14,7 +14,7 @@ type GridLayout struct {
 	gridAlign map[image.Point]swtk.Alignmenter
 	gridSize  image.Point
 	size      image.Point
-	iChan	chan swtk.LayoutMsger
+	iChan     chan swtk.LayoutMsger
 }
 
 func NewGridLayout() *GridLayout {
@@ -25,8 +25,13 @@ func NewGridLayout() *GridLayout {
 	pn.gridAlign = make(map[image.Point]swtk.Alignmenter)
 	pn.gridSize = image.Point{0, 0}
 	pn.iChan = make(chan swtk.LayoutMsger)
-	go swtk.LayoutActor(pn)
 	return pn
+}
+
+func NewGridLayoutActor() *GridLayout {
+	gl := NewGridLayout()
+	go swtk.LayoutActor(gl)
+	return gl
 }
 
 func (gl *GridLayout) LayoutMsgChan() chan swtk.LayoutMsger {
@@ -131,7 +136,7 @@ func (gl *GridLayout) AddPane(pane swtk.Pane, x, y int) {
 	gl.gridAlign[p] = swtk.AlignCenter
 	gl.thePane.Renderer().RegisterPane(pane, gl.thePane)
 	pane.PaneMsgChan() <- swtk.SetRendererMsg{Renderer: gl.thePane.Renderer()}
-	
+
 }
 
 func (pn *GridLayout) SetAlignment(pane swtk.Pane, a swtk.Alignmenter) {

@@ -8,24 +8,20 @@ import "github.com/ctlod/go.swtk/displays"
 
 func main() {
 
-	window := renderers.NewWdeRenderer("Test Window", image.White)
+	r := renderers.NewWdeRenderer()
 
-	p := swtk.NewStandardPane()
-	p.PaneMsgChan() <- swtk.SetLayouterMsg{Layouter: layouts.NewGridLayout()}
+	w1 := r.NewWindowActor("Test Window", image.White, 400, 300)
+	w1.PaneMsgChan() <- swtk.SetLayouterMsg{Layouter: layouts.NewGridLayoutActor()}
 
-	window.SetBasePane(p)
+	p2 := swtk.NewStandardPaneActor()
+	p2.PaneMsgChan() <- swtk.SetVisualerMsg{Visualer: displays.NewSimpleColorActor(image.Black)}
+	w1.Layouter().LayoutMsgChan() <- swtk.AddPaneMsg{p2, 1, 2}
+	p3 := swtk.NewStandardPaneActor()
+	p3.PaneMsgChan() <- swtk.SetVisualerMsg{Visualer: displays.NewSimpleColorActor(image.Black)}
+	w1.Layouter().LayoutMsgChan() <- swtk.AddPaneMsg{p3, 2, 1}
+	w1.PaneMsgChan() <- swtk.ResizeMsg{Size: image.Point{400, 300}, View: image.Rect(0, 0, 400, 300)}
 
-	go window.Run()
+	r.NewWindowActor("Test Window 2", image.Black, 200, 200)
 
-	p2 := swtk.NewStandardPane()
-	p2.PaneMsgChan() <- swtk.SetVisualerMsg{Visualer: displays.NewSimpleColor(image.Black)}
-	p.Layouter().LayoutMsgChan() <- swtk.AddPaneMsg{p2, 1, 2}
-
-	p3 := swtk.NewStandardPane()
-	p3.PaneMsgChan() <- swtk.SetVisualerMsg{Visualer: displays.NewSimpleColor(image.Black)}
-	p.Layouter().LayoutMsgChan() <- swtk.AddPaneMsg{p3, 2, 1}
-
-	p.PaneMsgChan() <- swtk.ResizeMsg{Size: image.Point{400, 300}, View: image.Rect(0, 0, 400, 300)}
-
-	window.BackEndRun()
+	r.BackEndRun()
 }

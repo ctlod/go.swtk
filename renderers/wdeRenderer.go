@@ -8,6 +8,10 @@ import "image/draw"
 import "image/color"
 import "github.com/ctlod/go.swtk"
 
+const (
+	wdeDebug = true
+)
+
 type paneNode struct {
 	children []*paneNode
 	parent   *paneNode
@@ -17,8 +21,10 @@ type paneNode struct {
 	pane     swtk.Pane
 }
 
-type wdeRenderer struct {
-	basePane      swtk.Pane
+type wdeRenderer struct{}
+
+type wdeWindow struct {
+	swtk.Pane
 	wdeWindow     wde.Window
 	renderList    []*paneNode
 	paneMap       map[int]*paneNode
@@ -32,27 +38,44 @@ type wdeRenderer struct {
 	pointerPanes  map[image.Point]swtk.Pane
 }
 
-func NewWdeRenderer(title string, bg color.Color) *wdeRenderer {
+func (wr *wdeRenderer) NewWindowActor(title string, bg color.Color, x int, y int) *wdeWindow {
+	w := new(wdeWindow)
+	w.Pane = swtk.NewStandardPane()
+
+	w.wdeWindow, _ = wde.NewWindow(x, y)
+	w.wdeWindow.SetTitle(title)
+	w.wdeWindow.Show()
+
+	w.paneMap = make(map[int]*paneNode)
+	w.panesCom = make(chan swtk.PaneImage, 100)
+	w.panesCoords = make(chan swtk.PaneCoords, 100)
+
+	w.minSize = image.Point{0, 0}
+	w.maxSize = image.Point{0, 0}
+
+	w.bgImage = image.NewUniform(bg)
+
+	w.mouseState = swtk.MouseState{int8(-1), int16(-1), int16(-1)}
+	w.pointerPanes = make(map[image.Point]swtk.Pane)
+
+	w.SetRenderer(w)
+	if wdeDebug {
+		log.Println("WindowPane: ", w.Id())
+	}
+	w.paneMap[w.Id()] = new(paneNode)
+	w.paneMap[w.Id()].pane = w
+	w.renderList = buildRenderList(w.paneMap[w.Id()], nil)
+	if wdeDebug {
+		log.Println(w.renderList, w.renderList[0].pane.Id())
+	}
+
+	go w.Run()
+
+	return w
+}
+
+func NewWdeRenderer() *wdeRenderer {
 	wr := new(wdeRenderer)
-
-	wr.wdeWindow, _ = wde.NewWindow(400, 300)
-	wr.wdeWindow.Show()
-	wr.wdeWindow.SetTitle(title)
-
-	wr.paneMap = make(map[int]*paneNode)
-
-	wr.panesCom = make(chan swtk.PaneImage, 100)
-	wr.panesCoords = make(chan swtk.PaneCoords, 100)
-
-	wr.minSize = image.Point{0, 0}
-	wr.maxSize = image.Point{0, 0}
-
-	wr.bgImage = image.NewUniform(bg)
-
-	wr.mouseState = swtk.MouseState{int8(-1), int16(-1), int16(-1)}
-
-	wr.pointerPanes = make(map[image.Point]swtk.Pane)
-
 	return wr
 }
 
@@ -60,7 +83,7 @@ func (wr *wdeRenderer) BackEndRun() {
 	wde.Run()
 }
 
-func (wr *wdeRenderer) Run() {
+func (wr *wdeWindow) Run() {
 	wr.handleWindowResize()
 	for {
 		select {
@@ -70,8 +93,8 @@ func (wr *wdeRenderer) Run() {
 			} else {
 				switch e := e.(type) {
 				case wde.CloseEvent:
-					if wr.basePane != nil {
-						close(wr.basePane.PaneMsgChan())
+					if wr.Layouter() != nil {
+						close(wr.Layouter().LayoutMsgChan())
 					}
 					wr.wdeWindow.Close()
 					wde.Stop()
@@ -80,11 +103,13 @@ func (wr *wdeRenderer) Run() {
 					x, y := wr.wdeWindow.Size()
 					if (x != 0) && (y != 0) {
 						wr.handleWindowResize()
-						if wr.basePane != nil {
-							p := image.Point{x, y}
-							wr.refreshLocation(wr.basePane, image.ZP, p)
-							b := image.Rectangle{image.ZP, p}
-							wr.basePane.PaneMsgChan() <- swtk.ResizeMsg{Size: p, View: b}
+						p := image.Point{x, y}
+						wr.refreshLocation(wr, image.ZP, p)
+						b := image.Rectangle{image.ZP, p}
+						msg := swtk.ResizeMsg{Size: p, View: b}
+						wr.SetSize(msg)
+						if wr.Layouter() != nil {
+							wr.Layouter().LayoutMsgChan() <- msg
 						}
 					}
 				case wde.MouseDownEvent:
@@ -108,7 +133,9 @@ func (wr *wdeRenderer) Run() {
 				case wde.KeyDownEvent:
 				case wde.KeyUpEvent:
 				case wde.KeyTypedEvent:
-					log.Println(e.Key, e.Glyph, e.Chord)
+					if wdeDebug {
+						log.Println(e.Key, e.Glyph, e.Chord)
+					}
 				default:
 				}
 			}
@@ -141,11 +168,24 @@ func (wr *wdeRenderer) Run() {
 					break panesCoords
 				}
 			}
+		case msg := <-wr.PaneMsgChan():
+			switch msg := msg.(type) {
+			case swtk.ResizeMsg:
+				wr.SetSize(msg)
+				if wr.Layouter() != nil {
+					wr.Layouter().LayoutMsgChan() <- msg
+				}
+			case swtk.SetLayouterMsg:
+				if wr.Layouter() == nil {
+					wr.SetLayouter(msg.Layouter)
+					msg.Layouter.LayoutMsgChan() <- swtk.SetPaneMsg{Pane: wr}
+				}
+			}
 		}
 	}
 }
 
-func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
+func (wr *wdeWindow) wdeHandleMouseState(ms swtk.MouseState) {
 	//mouse event
 	if ms.B < 0 && ms.X < 0 {
 		//exit event
@@ -193,7 +233,7 @@ func (wr *wdeRenderer) wdeHandleMouseState(ms swtk.MouseState) {
 	wr.mouseState = ms
 }
 
-func (wr *wdeRenderer) findNode(x, y int) *paneNode {
+func (wr *wdeWindow) findNode(x, y int) *paneNode {
 	if len(wr.renderList) == 0 {
 		return nil
 	}
@@ -222,7 +262,7 @@ func (wr *wdeRenderer) findNode(x, y int) *paneNode {
 	return currentNode
 }
 
-func (wr *wdeRenderer) RegisterPane(pane swtk.Pane, parentPane swtk.Pane) {
+func (wr *wdeWindow) RegisterPane(pane swtk.Pane, parentPane swtk.Pane) {
 	if wr.paneMap[pane.Id()] != nil {
 		return
 	}
@@ -236,23 +276,10 @@ func (wr *wdeRenderer) RegisterPane(pane swtk.Pane, parentPane swtk.Pane) {
 	wr.paneMap[pane.Id()].parent = wr.paneMap[parentPane.Id()]
 	wr.paneMap[parentPane.Id()].children = append(wr.paneMap[parentPane.Id()].children, wr.paneMap[pane.Id()])
 	wr.paneMap[pane.Id()].pane = pane
-	wr.renderList = buildRenderList(wr.paneMap[wr.basePane.Id()], nil)
+	wr.renderList = buildRenderList(wr.paneMap[wr.Id()], nil)
 }
 
-func (wr *wdeRenderer) SetBasePane(pane swtk.Pane) {
-	if wr.basePane != nil {
-		log.Println("wdeRenderer.go - SetBasePane: Already Set!")
-	}
-	wr.basePane = pane
-	pane.PaneMsgChan() <- swtk.SetRendererMsg{Renderer: wr}
-	log.Println("BasePane: ", wr.basePane.Id())
-	wr.paneMap[pane.Id()] = new(paneNode)
-	wr.paneMap[pane.Id()].pane = pane
-	wr.renderList = buildRenderList(wr.paneMap[wr.basePane.Id()], nil)
-	log.Println(wr.renderList, wr.renderList[0].pane.Id())
-}
-
-func (wr *wdeRenderer) refreshLocation(pane swtk.Pane, point image.Point, sizes image.Point) {
+func (wr *wdeWindow) refreshLocation(pane swtk.Pane, point image.Point, sizes image.Point) {
 	log.Println("wdeRendere refreshlocation", pane.Id(), point, sizes)
 	node := wr.paneMap[pane.Id()]
 	if node.parent != nil {
@@ -263,21 +290,21 @@ func (wr *wdeRenderer) refreshLocation(pane swtk.Pane, point image.Point, sizes 
 	node.dy = sizes.Y
 }
 
-func (wr *wdeRenderer) refreshBuffer(pane swtk.Pane, im draw.Image) {
+func (wr *wdeWindow) refreshBuffer(pane swtk.Pane, im draw.Image) {
 	log.Println("wdeRendere refreshbuffer", pane, &im)
 	node := wr.paneMap[pane.Id()]
 	node.im = im
 }
 
-func (wr *wdeRenderer) SetAspect(im swtk.PaneImage) {
+func (wr *wdeWindow) SetAspect(im swtk.PaneImage) {
 	wr.panesCom <- im
 }
 
-func (wr *wdeRenderer) SetLocation(pc swtk.PaneCoords) {
+func (wr *wdeWindow) SetLocation(pc swtk.PaneCoords) {
 	wr.panesCoords <- pc
 }
 
-func (wr *wdeRenderer) render(section image.Rectangle) {
+func (wr *wdeWindow) render(section image.Rectangle) {
 	log.Println("wdeRenderer render", section)
 	draw.Draw(wr.wdeWindow.Screen(), section, wr.bgImage, image.ZP.Sub(section.Min), draw.Src)
 	for _, src := range wr.renderList {
@@ -291,7 +318,7 @@ func (wr *wdeRenderer) render(section image.Rectangle) {
 	wr.wdeWindow.FlushImage(section)
 }
 
-func (wr *wdeRenderer) handleWindowResize() {
+func (wr *wdeWindow) handleWindowResize() {
 	for _, src := range wr.renderList {
 		src.im = nil
 		src.x = 0
