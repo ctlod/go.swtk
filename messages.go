@@ -51,8 +51,8 @@ type SetActionerMsg struct {
 	PaneMessage
 }
 
-type SetRendererMsg struct {
-	Renderer Renderer
+type SetWindowerMsg struct {
+	Windower Windower
 	PaneMessage
 }
 

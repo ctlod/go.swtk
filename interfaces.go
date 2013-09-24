@@ -3,6 +3,10 @@ package swtk
 import "image"
 import "log"
 
+const (
+	intfDebug = true
+)
+
 type Pane interface {
 	MinMax() (image.Point, image.Point)
 	Size() image.Point
@@ -22,8 +26,8 @@ type Pane interface {
 	Layouter() Layouter
 	SetLayouter(ly Layouter)
 
-	Renderer() Renderer
-	SetRenderer(rd Renderer)
+	Windower() Windower
+	SetWindower(wn Windower)
 }
 
 type PaneMsger interface {
@@ -71,14 +75,14 @@ type Layouter interface {
 	RemovePane(pane Pane)
 }
 
-type Renderer interface {
+type Windower interface {
 	RegisterPane(pane Pane, parentPane Pane)
 	SetAspect(pi PaneImage)
 	SetLocation(pc PaneCoords)
 	Run()
 }
 
-type NewRenderer interface {
+type Renderer interface {
 	BackEndRun()
 }
 
@@ -91,7 +95,9 @@ func VisualActor(vs Visualer) {
 			}
 			switch msg := msg.(type) {
 			case ResizeMsg:
-				log.Println("Drawing ", vs.Pane().Id())
+				if intfDebug {
+					log.Println("Drawing ", vs.Pane().Id())
+				}
 				vs.ResizeCanvas(msg)
 				vs.Draw()
 			case SetPaneMsg:
@@ -113,7 +119,9 @@ func LayoutActor(ly Layouter) {
 			}
 			switch msg := msg.(type) {
 			case ResizeMsg:
-				log.Println("Layouting ", ly.Pane().Id())
+				if intfDebug {
+					log.Println("Layouting ", ly.Pane().Id())
+				}
 				ly.MapResize(msg)
 			case SetPaneMsg:
 				ly.SetPane(msg.Pane)
@@ -140,10 +148,14 @@ func PaneActor(pn Pane) {
 				}
 				return
 			}
-			log.Println("Received Msg for Pane ", pn.Id())
+			if intfDebug {
+				log.Println("Received Msg for Pane ", pn.Id())
+			}
 			switch msg := msg.(type) {
 			case ResizeMsg:
-				log.Println("Resize ", pn.Id())
+				if intfDebug {
+					log.Println("Resize ", pn.Id())
+				}
 				pn.SetSize(msg)
 				if pn.Layouter() != nil {
 					pn.Layouter().LayoutMsgChan() <- msg
@@ -151,9 +163,9 @@ func PaneActor(pn Pane) {
 				if pn.Visualer() != nil {
 					pn.Visualer().VisualMsgChan() <- msg
 				}
-			case SetRendererMsg:
-				if pn.Renderer() == nil {
-					pn.SetRenderer(msg.Renderer)
+			case SetWindowerMsg:
+				if pn.Windower() == nil {
+					pn.SetWindower(msg.Windower)
 				}
 			case SetLayouterMsg:
 				if pn.Layouter() == nil {
@@ -162,7 +174,9 @@ func PaneActor(pn Pane) {
 				}
 			case SetVisualerMsg:
 				if pn.Visualer() == nil {
-					log.Println("Adding visual to ", pn.Id())
+					if intfDebug {
+						log.Println("Adding visual to ", pn.Id())
+					}
 					pn.SetVisualer(msg.Visualer)
 					msg.Visualer.VisualMsgChan() <- SetPaneMsg{Pane: pn}
 				}
@@ -171,7 +185,9 @@ func PaneActor(pn Pane) {
 			}
 		}
 	}
-	log.Println("Stopping ", pn.Id())
+	if intfDebug {
+		log.Println("Stopping ", pn.Id())
+	}
 }
 
 func SwtkId() int {

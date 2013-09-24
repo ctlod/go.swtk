@@ -15,7 +15,7 @@ type standardPane struct {
 	layouter Layouter
 	actioner Actioner
 
-	renderer Renderer
+	windower Windower
 }
 
 func (pn *standardPane) MinMax() (image.Point, image.Point) {
@@ -67,12 +67,12 @@ func (pn *standardPane) SetActioner(ac Actioner) {
 	pn.actioner = ac
 }
 
-func (pn *standardPane) Renderer() Renderer {
-	return pn.renderer
+func (pn *standardPane) Windower() Windower {
+	return pn.windower
 }
 
-func (pn *standardPane) SetRenderer(rn Renderer) {
-	pn.renderer = rn
+func (pn *standardPane) SetWindower(wn Windower) {
+	pn.windower = wn
 }
 
 func (pn *standardPane) SetSize(rs ResizeMsg) {

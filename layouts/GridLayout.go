@@ -101,7 +101,7 @@ func (pn *GridLayout) MapResize(re swtk.ResizeMsg) {
 		p := image.Rect(0, 0, size.X, size.Y).Add(origin)
 		p = p.Intersect(re.View)
 
-		pn.thePane.Renderer().SetLocation(swtk.PaneCoords{child, p.Min, image.Point{p.Dx(), p.Dy()}})
+		pn.thePane.Windower().SetLocation(swtk.PaneCoords{child, p.Min, image.Point{p.Dx(), p.Dy()}})
 		child.PaneMsgChan() <- swtk.ResizeMsg{Size: size, View: p.Sub(origin)}
 	}
 }
@@ -134,8 +134,8 @@ func (gl *GridLayout) AddPane(pane swtk.Pane, x, y int) {
 	gl.paneCell[pane.Id()] = &p
 	gl.gridCell[p] = pane
 	gl.gridAlign[p] = swtk.AlignCenter
-	gl.thePane.Renderer().RegisterPane(pane, gl.thePane)
-	pane.PaneMsgChan() <- swtk.SetRendererMsg{Renderer: gl.thePane.Renderer()}
+	gl.thePane.Windower().RegisterPane(pane, gl.thePane)
+	pane.PaneMsgChan() <- swtk.SetWindowerMsg{Windower: gl.thePane.Windower()}
 
 }
 

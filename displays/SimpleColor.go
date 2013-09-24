@@ -70,5 +70,5 @@ func (sc *simpleColor) Draw() {
 		r := sc.canvas.Bounds()
 		draw.Draw(sc.canvas, r, sc.bg, image.ZP, draw.Src)
 	}
-	sc.thePane.Renderer().SetAspect(swtk.PaneImage{sc.thePane, sc.canvas})
+	sc.thePane.Windower().SetAspect(swtk.PaneImage{sc.thePane, sc.canvas})
 }

@@ -58,7 +58,7 @@ func (wr *wdeRenderer) NewWindowActor(title string, bg color.Color, x int, y int
 	w.mouseState = swtk.MouseState{int8(-1), int16(-1), int16(-1)}
 	w.pointerPanes = make(map[image.Point]swtk.Pane)
 
-	w.SetRenderer(w)
+	w.SetWindower(w)
 	if wdeDebug {
 		log.Println("WindowPane: ", w.Id())
 	}
